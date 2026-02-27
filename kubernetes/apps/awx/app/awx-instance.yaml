@@ -1,0 +1,47 @@
+---
+apiVersion: awx.ansible.com/v1beta1
+kind: AWX
+metadata:
+  name: awx
+  namespace: awx
+spec:
+  service_type: NodePort
+  nodeport_port: 30080
+
+  admin_user: admin
+  admin_password_secret: awx-admin-password
+  secret_key_secret: awx-secret-key
+
+  postgres_configuration_secret: awx-postgres-configuration
+  postgres_storage_class: local-path
+  postgres_storage_requirements:
+    requests:
+      storage: 8Gi
+
+  projects_persistence: true
+  projects_storage_class: local-path
+  projects_storage_size: 8Gi
+
+  web_resource_requirements:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  task_resource_requirements:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  ee_resource_requirements:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi

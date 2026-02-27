@@ -1,0 +1,95 @@
+---
+- name: Install k3s on single-node Raspberry Pi
+  hosts: k3s
+  gather_facts: true
+  vars:
+    k3s_version: v1.31.4+k3s1
+    kubeconfig_local_path: "{{ playbook_dir }}/../../kubeconfig"
+
+  pre_tasks:
+    - name: Verify ARM64 architecture
+      ansible.builtin.assert:
+        that: ansible_architecture == "aarch64"
+        fail_msg: "This playbook targets ARM64 (aarch64) hosts only"
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - open-iscsi
+          - nfs-common
+        state: present
+
+    - name: Enable and start iscsid
+      ansible.builtin.systemd:
+        name: iscsid
+        enabled: true
+        state: started
+
+    - name: Check if k3s is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s
+      register: k3s_binary
+
+    - name: Download k3s install script
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-install.sh
+        mode: "0755"
+      when: not k3s_binary.stat.exists
+
+    - name: Install k3s
+      ansible.builtin.command:
+        cmd: /tmp/k3s-install.sh
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        INSTALL_K3S_EXEC: >-
+          server
+          --disable traefik
+          --disable servicelb
+          --write-kubeconfig-mode 0644
+          --node-name {{ k3s_node_name }}
+          --tls-san {{ ansible_host }}
+      when: not k3s_binary.stat.exists
+      changed_when: true
+
+    - name: Wait for k3s to be ready
+      ansible.builtin.command:
+        cmd: k3s kubectl get nodes
+      register: k3s_nodes
+      until: k3s_nodes.rc == 0
+      retries: 30
+      delay: 5
+      changed_when: false
+
+    - name: Ensure k3s service is enabled
+      ansible.builtin.systemd:
+        name: k3s
+        enabled: true
+        state: started
+
+    - name: Read kubeconfig from server
+      ansible.builtin.slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: k3s_kubeconfig_raw
+
+    - name: Write kubeconfig locally
+      ansible.builtin.copy:
+        content: "{{ k3s_kubeconfig_raw.content | b64decode | regex_replace('127.0.0.1', ansible_host) }}"
+        dest: "{{ kubeconfig_local_path }}"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Display cluster info
+      ansible.builtin.debug:
+        msg: |
+          k3s installed successfully!
+          Kubeconfig written to: {{ kubeconfig_local_path }}
+          Usage: export KUBECONFIG={{ kubeconfig_local_path }}
