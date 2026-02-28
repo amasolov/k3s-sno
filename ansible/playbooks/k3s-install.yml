@@ -5,6 +5,8 @@
   vars:
     k3s_version: v1.31.4+k3s1
     kubeconfig_local_path: "{{ playbook_dir }}/../../kubeconfig"
+    swap_size_mb: 4096
+    swap_file: /swapfile
 
   pre_tasks:
     - name: Verify ARM64 architecture
@@ -25,6 +27,51 @@
           - open-iscsi
           - nfs-common
         state: present
+
+    - name: Check if swap file exists
+      ansible.builtin.stat:
+        path: "{{ swap_file }}"
+      register: swap_check
+
+    - name: Create swap file
+      ansible.builtin.command:
+        cmd: "dd if=/dev/zero of={{ swap_file }} bs=1M count={{ swap_size_mb }}"
+      when: not swap_check.stat.exists
+      changed_when: true
+
+    - name: Set swap file permissions
+      ansible.builtin.file:
+        path: "{{ swap_file }}"
+        mode: "0600"
+        owner: root
+        group: root
+
+    - name: Format swap file
+      ansible.builtin.command:
+        cmd: "mkswap {{ swap_file }}"
+      when: not swap_check.stat.exists
+      changed_when: true
+
+    - name: Enable swap
+      ansible.builtin.command:
+        cmd: "swapon {{ swap_file }}"
+      when: not swap_check.stat.exists
+      changed_when: true
+
+    - name: Add swap to fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        regexp: "^{{ swap_file }}"
+        line: "{{ swap_file }} none swap sw 0 0"
+        state: present
+
+    - name: Set swappiness to 10
+      ansible.posix.sysctl:
+        name: vm.swappiness
+        value: "10"
+        state: present
+        sysctl_set: true
+        reload: true
 
     - name: Enable and start iscsid
       ansible.builtin.systemd:
