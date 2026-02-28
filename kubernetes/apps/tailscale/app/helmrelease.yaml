@@ -38,6 +38,8 @@ spec:
       clientSecret: ""
     operatorConfig:
       hostname: k3s-sno-operator
+      defaultTags:
+        - tag:k3s-sno
     apiServerProxyConfig:
       mode: "false"
   valuesFrom:
