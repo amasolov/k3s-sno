@@ -5,7 +5,7 @@ metadata:
   name: awx
   namespace: awx
 spec:
-  image: quay.io/ansible/awx
+  image: ghcr.io/ansible/awx
   image_version: devel
   image_pull_policy: Always
 
