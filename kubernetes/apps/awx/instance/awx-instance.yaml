@@ -21,6 +21,7 @@ spec:
   projects_persistence: true
   projects_storage_class: local-path
   projects_storage_size: 8Gi
+  projects_storage_access_mode: ReadWriteOnce
 
   web_resource_requirements:
     requests:
