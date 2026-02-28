@@ -32,3 +32,4 @@ spec:
   targetNamespace: awx
   dependsOn:
     - name: awx
+    - name: cloudnative-pg-cluster

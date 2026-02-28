@@ -59,14 +59,6 @@
       "matchPackageNames": [
         "/external-secrets/"
       ]
-    },
-    {
-      "description": "ESO 2.0 requires manual migration, block major updates",
-      "matchPackageNames": [
-        "/external-secrets/"
-      ],
-      "matchUpdateTypes": ["major"],
-      "enabled": false
     }
   ]
 }
