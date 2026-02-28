@@ -5,10 +5,6 @@ metadata:
   name: awx
   namespace: awx
 spec:
-  image: ghcr.io/ansible/awx
-  image_version: devel
-  image_pull_policy: Always
-
   service_type: NodePort
   nodeport_port: 30080
 
