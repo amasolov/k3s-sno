@@ -1,0 +1,12 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: awx-db-hourly
+  namespace: cnpg-system
+spec:
+  schedule: "0 * * * *"
+  backupOwnerReference: self
+  immediate: true
+  cluster:
+    name: awx-db

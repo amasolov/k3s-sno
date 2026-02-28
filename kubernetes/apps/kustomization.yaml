@@ -5,4 +5,5 @@ resources:
   - ./external-secrets/ks.yaml
   - ./coredns/ks.yaml
   - ./tailscale/ks.yaml
+  - ./cloudnative-pg/ks.yaml
   - ./awx/ks.yaml

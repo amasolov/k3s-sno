@@ -1,0 +1,45 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: awx-db
+  namespace: cnpg-system
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+
+  storage:
+    storageClass: local-path
+    size: 8Gi
+
+  bootstrap:
+    initdb:
+      database: awx
+      owner: awx
+      secret:
+        name: awx-db-credentials
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://k3s-snow/cnpg/
+      endpointURL: https://f83921207a0950106ace0d7751708a29.r2.cloudflarestorage.com
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-r2-credentials
+          key: access-key-id
+        secretAccessKey:
+          name: cnpg-r2-credentials
+          key: secret-access-key
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: 7d
