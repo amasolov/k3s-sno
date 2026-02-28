@@ -18,7 +18,7 @@ spec:
   chart:
     spec:
       chart: external-secrets
-      version: "2.0.x"
+      version: "0.12.x"
       sourceRef:
         kind: HelmRepository
         name: external-secrets
