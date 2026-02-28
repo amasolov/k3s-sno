@@ -1,0 +1,56 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:enableMajor",
+    ":disableRateLimiting",
+    ":semanticCommits",
+    ":automergeBranch"
+  ],
+  "flux": {
+    "fileMatch": [
+      "(^|/)kubernetes/.+\\.ya?ml$"
+    ]
+  },
+  "helm-values": {
+    "fileMatch": [
+      "(^|/)kubernetes/.+\\.ya?ml$"
+    ]
+  },
+  "kubernetes": {
+    "fileMatch": [
+      "(^|/)kubernetes/.+\\.ya?ml$"
+    ]
+  },
+  "regexManagers": [
+    {
+      "description": "Process k3s version in Ansible playbook",
+      "fileMatch": [
+        "(^|/)ansible/.+\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "k3s_version:\\s*(?<currentValue>v[\\d.]+\\+k3s\\d+)"
+      ],
+      "depNameTemplate": "k3s-io/k3s",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Auto-merge patch and minor updates",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Group Flux updates",
+      "matchPackagePatterns": ["flux"],
+      "groupName": "Flux"
+    },
+    {
+      "description": "Group External Secrets updates",
+      "matchPackagePatterns": ["external-secrets"],
+      "groupName": "External Secrets"
+    }
+  ]
+}
