@@ -1,0 +1,300 @@
+---
+# AWX Configuration as Code
+#
+# Defines the complete AWX configuration as Ansible variables and applies
+# it via the awx.awx collection. All resources are idempotent -- running
+# this playbook multiple times converges to the desired state.
+#
+# Bootstrap from laptop:
+#   ansible-playbook -i inventory/awx_config.yml playbooks/awx-config.yml
+#
+# Requires:
+#   - AWS credentials in environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
+#   - Required secrets in AWS Secrets Manager (see README)
+#   - AWX instance running and accessible
+
+- name: Configure AWX
+  hosts: localhost
+  gather_facts: false
+
+  module_defaults:
+    group/awx.awx.controller:
+      controller_host: "{{ controller_host }}"
+      controller_username: "{{ controller_username | default(omit) }}"
+      controller_password: "{{ controller_password | default(omit) }}"
+      validate_certs: false
+
+  vars:
+    aws_region: "{{ lookup('env', 'AWS_DEFAULT_REGION') | default('us-east-1', true) }}"
+    controller_password: >-
+      {{ lookup('amazon.aws.aws_secret', 'k3s-sno/awx/admin-password', region=aws_region) }}
+
+    # ━━━ Organizations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_organizations:
+      - name: Home Ops
+        description: Home infrastructure automation
+
+    # ━━━ Credential Types (custom) ━━━━━━━━━━━━━━━━━━━━━
+    awx_credential_types:
+      - name: AWX Controller
+        kind: cloud
+        inputs:
+          fields:
+            - id: host
+              type: string
+              label: Controller Host
+            - id: username
+              type: string
+              label: Controller Username
+            - id: password
+              type: string
+              label: Controller Password
+              secret: true
+        injectors:
+          env:
+            CONTROLLER_HOST: !unsafe "{{ host }}"
+            CONTROLLER_USERNAME: !unsafe "{{ username }}"
+            CONTROLLER_PASSWORD: !unsafe "{{ password }}"
+
+    # ━━━ Credentials ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_credentials:
+      - name: Home Lab SSH
+        organization: Home Ops
+        credential_type: Machine
+        inputs:
+          username: amasolov
+          ssh_key_data: >-
+            {{ lookup('amazon.aws.aws_secret', 'k3s-sno/awx/ssh-private-key', region=aws_region) }}
+
+      - name: AWX Controller
+        organization: Home Ops
+        credential_type: AWX Controller
+        inputs:
+          host: http://awx-service.awx.svc:80
+          username: admin
+          password: >-
+            {{ lookup('amazon.aws.aws_secret', 'k3s-sno/awx/admin-password', region=aws_region) }}
+
+      - name: AWS
+        organization: Home Ops
+        credential_type: Amazon Web Services
+        inputs:
+          username: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+          password: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+
+    # ━━━ Projects ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_projects:
+      - name: Home Ops
+        organization: Home Ops
+        scm_type: git
+        scm_url: https://github.com/amasolov/k3s-sno.git
+        scm_branch: main
+        scm_update_on_launch: true
+
+    # ━━━ Inventories ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_inventories:
+      - name: Home Lab
+        organization: Home Ops
+        hosts:
+          - name: ktmb1-g-srv-003
+            variables:
+              ansible_host: ktmb1-g-srv-003.iot.ktmb1.net
+              ansible_user: amasolov
+
+      - name: AWX Controller
+        organization: Home Ops
+        description: Localhost for AWX self-configuration
+        hosts:
+          - name: localhost
+            variables:
+              ansible_connection: local
+
+    # ━━━ Job Templates ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_job_templates:
+      - name: Install k3s
+        organization: Home Ops
+        project: Home Ops
+        playbook: ansible/playbooks/k3s-install.yml
+        inventory: Home Lab
+        credentials:
+          - Home Lab SSH
+        become_enabled: true
+
+      - name: AWX Self-Configure
+        organization: Home Ops
+        project: Home Ops
+        playbook: ansible/playbooks/awx-config.yml
+        inventory: AWX Controller
+        credentials:
+          - AWX Controller
+          - AWS
+        description: >-
+          Re-applies AWX configuration from Git. Requires an EE
+          with awx.awx and amazon.aws collections installed.
+
+    # ━━━ Workflow Templates ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_workflow_templates: []
+
+    # ━━━ Schedules ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_schedules: []
+
+    # ━━━ Notification Templates ━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_notification_templates: []
+
+    # ━━━ Teams ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_teams: []
+
+    # ━━━ Users ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_users: []
+
+  tasks:
+    # ── 1. Organizations ────────────────────────────────
+    - name: Configure organizations
+      awx.awx.organization:
+        name: "{{ item.name }}"
+        description: "{{ item.description | default(omit) }}"
+        state: present
+      loop: "{{ awx_organizations }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 2. Custom credential types ──────────────────────
+    - name: Configure credential types
+      awx.awx.credential_type:
+        name: "{{ item.name }}"
+        kind: "{{ item.kind }}"
+        inputs: "{{ item.inputs }}"
+        injectors: "{{ item.injectors }}"
+        state: present
+      loop: "{{ awx_credential_types }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 3. Credentials ──────────────────────────────────
+    - name: Configure credentials
+      awx.awx.credential:
+        name: "{{ item.name }}"
+        organization: "{{ item.organization }}"
+        credential_type: "{{ item.credential_type }}"
+        inputs: "{{ item.inputs }}"
+        description: "{{ item.description | default(omit) }}"
+        state: present
+      loop: "{{ awx_credentials }}"
+      loop_control:
+        label: "{{ item.name }}"
+      no_log: true
+
+    # ── 4. Projects ─────────────────────────────────────
+    - name: Configure projects
+      awx.awx.project:
+        name: "{{ item.name }}"
+        organization: "{{ item.organization }}"
+        scm_type: "{{ item.scm_type }}"
+        scm_url: "{{ item.scm_url }}"
+        scm_branch: "{{ item.scm_branch | default('main') }}"
+        scm_update_on_launch: "{{ item.scm_update_on_launch | default(true) }}"
+        scm_credential: "{{ item.scm_credential | default(omit) }}"
+        wait: true
+        state: present
+      loop: "{{ awx_projects }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 5. Inventories & hosts ──────────────────────────
+    - name: Configure inventories
+      awx.awx.inventory:
+        name: "{{ item.name }}"
+        organization: "{{ item.organization }}"
+        description: "{{ item.description | default(omit) }}"
+        state: present
+      loop: "{{ awx_inventories }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Configure inventory hosts
+      awx.awx.host:
+        name: "{{ item.1.name }}"
+        inventory: "{{ item.0.name }}"
+        variables: "{{ item.1.variables | default({}) }}"
+        state: present
+      loop: "{{ awx_inventories | subelements('hosts', skip_missing=true) }}"
+      loop_control:
+        label: "{{ item.0.name }}/{{ item.1.name }}"
+
+    # ── 6. Job templates ────────────────────────────────
+    - name: Configure job templates
+      awx.awx.job_template:
+        name: "{{ item.name }}"
+        organization: "{{ item.organization }}"
+        project: "{{ item.project }}"
+        playbook: "{{ item.playbook }}"
+        inventory: "{{ item.inventory }}"
+        credentials: "{{ item.credentials | default(omit) }}"
+        become_enabled: "{{ item.become_enabled | default(false) }}"
+        extra_vars: "{{ item.extra_vars | default(omit) }}"
+        description: "{{ item.description | default(omit) }}"
+        state: present
+      loop: "{{ awx_job_templates }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 7. Workflow templates ───────────────────────────
+    - name: Configure workflow templates
+      awx.awx.workflow_job_template:
+        name: "{{ item.name }}"
+        organization: "{{ item.organization }}"
+        description: "{{ item.description | default(omit) }}"
+        state: present
+      loop: "{{ awx_workflow_templates }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 8. Schedules ────────────────────────────────────
+    - name: Configure schedules
+      awx.awx.schedule:
+        name: "{{ item.name }}"
+        unified_job_template: "{{ item.unified_job_template }}"
+        rrule: "{{ item.rrule }}"
+        enabled: "{{ item.enabled | default(true) }}"
+        state: present
+      loop: "{{ awx_schedules }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 9. Notification templates ───────────────────────
+    - name: Configure notification templates
+      awx.awx.notification_template:
+        name: "{{ item.name }}"
+        organization: "{{ item.organization }}"
+        notification_type: "{{ item.notification_type }}"
+        notification_configuration: "{{ item.notification_configuration }}"
+        state: present
+      loop: "{{ awx_notification_templates }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 10. Teams ───────────────────────────────────────
+    - name: Configure teams
+      awx.awx.team:
+        name: "{{ item.name }}"
+        organization: "{{ item.organization }}"
+        description: "{{ item.description | default(omit) }}"
+        state: present
+      loop: "{{ awx_teams }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 11. Users ───────────────────────────────────────
+    - name: Configure users
+      awx.awx.user:
+        username: "{{ item.username }}"
+        first_name: "{{ item.first_name | default(omit) }}"
+        last_name: "{{ item.last_name | default(omit) }}"
+        email: "{{ item.email | default(omit) }}"
+        password: "{{ item.password | default(omit) }}"
+        is_superuser: "{{ item.is_superuser | default(false) }}"
+        state: present
+      loop: "{{ awx_users }}"
+      loop_control:
+        label: "{{ item.username }}"
+      no_log: true

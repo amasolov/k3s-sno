@@ -31,6 +31,7 @@ Create the following secrets in AWS Secrets Manager:
 | `k3s-sno/awx/admin-password` | AWX admin user password |
 | `k3s-sno/awx/postgres-password` | PostgreSQL database password |
 | `k3s-sno/awx/secret-key` | AWX secret key for encryption |
+| `k3s-sno/awx/ssh-private-key` | SSH private key for managed hosts |
 
 ```bash
 aws secretsmanager create-secret --name k3s-sno/awx/admin-password \
@@ -41,6 +42,9 @@ aws secretsmanager create-secret --name k3s-sno/awx/postgres-password \
 
 aws secretsmanager create-secret --name k3s-sno/awx/secret-key \
   --secret-string "$(openssl rand -hex 32)"
+
+aws secretsmanager create-secret --name k3s-sno/awx/ssh-private-key \
+  --secret-string "$(cat ~/.ssh/id_ed25519)"
 ```
 
 ## 2. Install k3s
@@ -106,7 +110,28 @@ kubectl -n awx get pods --watch
 kubectl -n awx logs -f deployment/awx-operator-controller-manager
 ```
 
-## 6. Access AWX
+## 6. Configure AWX (Infrastructure as Code)
+
+AWX configuration is defined as code in `ansible/playbooks/awx-config.yml`. The playbook uses the `awx.awx` collection to create all resources (organizations, projects, inventories, credentials, job templates, etc.) via the AWX REST API.
+
+```bash
+cd ansible
+ansible-galaxy collection install -r requirements.yml
+ansible-playbook -i inventory/awx_config.yml playbooks/awx-config.yml
+```
+
+This creates:
+- **Home Ops** organization with a **Home Lab** inventory
+- **Home Lab SSH** machine credential (key from AWS Secrets Manager)
+- **Home Ops** project pointing at this Git repo
+- **Install k3s** job template
+- **AWX Self-Configure** job template (so AWX can re-apply its own config)
+
+To add resources, edit the variable lists in `awx-config.yml` and re-run.
+
+The self-configure job template lets AWX re-run this playbook against itself. It requires an Execution Environment with the `awx.awx` and `amazon.aws` collections installed.
+
+## 7. Access AWX
 
 Once all pods are running:
 
@@ -118,11 +143,15 @@ Once all pods are running:
 
 ```
 k3s-sno/
-├── ansible/                          # k3s installation automation
+├── ansible/                          # Ansible automation
 │   ├── ansible.cfg
-│   ├── inventory/hosts.yml
-│   ├── requirements.yml
-│   └── playbooks/k3s-install.yml
+│   ├── requirements.yml              # Galaxy collections (awx.awx, amazon.aws, etc.)
+│   ├── inventory/
+│   │   ├── hosts.yml                 # Managed host inventory
+│   │   └── awx_config.yml           # AWX API connection for config-as-code
+│   └── playbooks/
+│       ├── k3s-install.yml           # k3s cluster installation
+│       └── awx-config.yml           # AWX configuration as code
 ├── kubernetes/
 │   ├── bootstrap/flux/               # Flux bootstrap (GitRepo + sync)
 │   ├── flux/config/                  # Top-level cluster Kustomization
