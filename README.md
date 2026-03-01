@@ -1,6 +1,6 @@
-# k3s Single-Node AWX + Squest Cluster
+# k3s Single-Node AWX Cluster
 
-GitOps-driven single-node k3s cluster running [AWX](https://github.com/ansible/awx) and [Squest](https://github.com/HewlettPackard/squest) on Raspberry Pi `ktmb1-g-srv-003.iot.ktmb1.net`.
+GitOps-driven single-node k3s cluster running [AWX](https://github.com/ansible/awx) on Raspberry Pi `ktmb1-g-srv-003.iot.ktmb1.net`.
 
 | Component | Tool |
 |---|---|
@@ -8,8 +8,9 @@ GitOps-driven single-node k3s cluster running [AWX](https://github.com/ansible/a
 | GitOps | Flux |
 | Secrets | External Secrets Operator + AWS Secrets Manager |
 | Storage | k3s local-path provisioner |
+| Database | CloudNativePG (PostgreSQL) with R2 backups |
 | Automation | AWX (Ansible Automation Platform) |
-| Service Portal | Squest (self-service portal for AWX) |
+| Network | Tailscale Operator |
 
 ## Prerequisites
 
@@ -30,10 +31,6 @@ Create the following secrets in AWS Secrets Manager:
 | `k3s-sno/awx/admin-password` | AWX admin user password |
 | `k3s-sno/awx/postgres-password` | PostgreSQL database password |
 | `k3s-sno/awx/secret-key` | AWX secret key for encryption |
-| `k3s-sno/squest/secret-key` | Squest Django SECRET_KEY |
-| `k3s-sno/squest/db-password` | Squest PostgreSQL password |
-| `k3s-sno/squest/rabbitmq-password` | Squest RabbitMQ password |
-| `k3s-sno/squest/redis-password` | Squest Redis password |
 
 ```bash
 aws secretsmanager create-secret --name k3s-sno/awx/admin-password \
@@ -44,18 +41,6 @@ aws secretsmanager create-secret --name k3s-sno/awx/postgres-password \
 
 aws secretsmanager create-secret --name k3s-sno/awx/secret-key \
   --secret-string "$(openssl rand -hex 32)"
-
-aws secretsmanager create-secret --name k3s-sno/squest/secret-key \
-  --secret-string "$(openssl rand -hex 32)"
-
-aws secretsmanager create-secret --name k3s-sno/squest/db-password \
-  --secret-string "$(openssl rand -base64 24)"
-
-aws secretsmanager create-secret --name k3s-sno/squest/rabbitmq-password \
-  --secret-string "$(openssl rand -hex 16)"
-
-aws secretsmanager create-secret --name k3s-sno/squest/redis-password \
-  --secret-string "$(openssl rand -hex 16)"
 ```
 
 ## 2. Install k3s
@@ -121,32 +106,13 @@ kubectl -n awx get pods --watch
 kubectl -n awx logs -f deployment/awx-operator-controller-manager
 ```
 
-## 6. Build Squest ARM64 Image
-
-The official Squest image is amd64-only and MySQL-only. A GitHub Actions workflow builds
-a patched ARM64 image with PostgreSQL support:
-
-1. Go to **Actions** > **Build Squest ARM64** in your GitHub repo
-2. Click **Run workflow** (defaults to the latest Squest release)
-3. The image is pushed to `ghcr.io/amasolov/squest:<version>` and `:latest`
-
-The build patches Squest to:
-- Accept a `DB_ENGINE` env var (defaults to MySQL for backward compatibility)
-- Fix MySQL-specific SQL in migrations for PostgreSQL compatibility
-
-This also runs weekly on a schedule to pick up new releases.
-
-## 7. Access Services
+## 6. Access AWX
 
 Once all pods are running:
 
 **AWX:** `http://ktmb1-g-srv-003.iot.ktmb1.net:30080`
 - **Username:** `admin`
 - **Password:** The value stored in `k3s-sno/awx/admin-password` in AWS Secrets Manager
-
-**Squest:** `http://ktmb1-g-srv-003.iot.ktmb1.net:30081`
-- **Username:** `admin`
-- **Password:** `admin` (default, change after first login)
 
 ## Repository Structure
 
@@ -165,8 +131,7 @@ k3s-sno/
 │       ├── cloudnative-pg/           # CNPG operator + shared PostgreSQL cluster
 │       ├── coredns/                  # Custom CoreDNS config (Tailscale MagicDNS)
 │       ├── tailscale/               # Tailscale Operator
-│       ├── awx/                      # AWX Operator + AWX instance
-│       └── squest/                   # Squest service portal
+│       └── awx/                      # AWX Operator + AWX instance
 ├── .gitignore
 └── README.md
 ```
