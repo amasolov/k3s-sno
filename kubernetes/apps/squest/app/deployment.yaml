@@ -17,7 +17,7 @@ spec:
       initContainers:
         - name: migrate
           image: ghcr.io/amasolov/squest:latest
-          command: ["python", "manage.py", "migrate", "--noinput"]
+          command: ["python", "manage.py", "migrate", "--database", "psql", "--noinput"]
           envFrom:
             - configMapRef:
                 name: squest-config

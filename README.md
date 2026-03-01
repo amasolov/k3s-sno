@@ -52,10 +52,10 @@ aws secretsmanager create-secret --name k3s-sno/squest/db-password \
   --secret-string "$(openssl rand -base64 24)"
 
 aws secretsmanager create-secret --name k3s-sno/squest/rabbitmq-password \
-  --secret-string "$(openssl rand -base64 24)"
+  --secret-string "$(openssl rand -hex 16)"
 
 aws secretsmanager create-secret --name k3s-sno/squest/redis-password \
-  --secret-string "$(openssl rand -base64 24)"
+  --secret-string "$(openssl rand -hex 16)"
 ```
 
 ## 2. Install k3s
