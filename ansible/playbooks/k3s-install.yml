@@ -3,7 +3,7 @@
   hosts: k3s
   gather_facts: true
   vars:
-    k3s_version: v1.31.4+k3s1
+    k3s_version: v1.35.1+k3s1
     kubeconfig_local_path: "{{ playbook_dir }}/../../kubeconfig"
     swap_size_mb: 4096
     swap_file: /swapfile
