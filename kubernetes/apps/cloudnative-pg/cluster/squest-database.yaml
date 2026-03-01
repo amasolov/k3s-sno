@@ -1,0 +1,11 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: squest-db
+  namespace: cnpg-system
+spec:
+  name: squest_db
+  owner: squest
+  cluster:
+    name: awx-db

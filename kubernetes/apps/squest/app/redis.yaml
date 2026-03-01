@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squest-redis
+  namespace: squest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: squest-redis
+  template:
+    metadata:
+      labels:
+        app: squest-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command:
+            - sh
+            - -c
+            - redis-server --maxmemory 24mb --maxmemory-policy allkeys-lru --requirepass $(REDIS_PASSWORD)
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: squest-redis-password
+                  key: password
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: squest-redis
+  namespace: squest
+spec:
+  selector:
+    app: squest-redis
+  ports:
+    - port: 6379
+      targetPort: 6379

@@ -19,6 +19,14 @@ spec:
       secret:
         name: awx-db-credentials
 
+  managed:
+    roles:
+      - name: squest
+        login: true
+        createdb: false
+        passwordSecret:
+          name: squest-db-credentials
+
   resources:
     requests:
       cpu: 200m

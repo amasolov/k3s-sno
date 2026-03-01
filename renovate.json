@@ -35,6 +35,18 @@
       "depNameTemplate": "k3s-io/k3s",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "Process Squest version in GitHub Actions workflow",
+      "managerFilePatterns": [
+        "/(^|/).github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=github-releases depName=HewlettPackard/squest\\n\\s+default:\\s*\"(?<currentValue>v[\\d.]+)\""
+      ],
+      "depNameTemplate": "HewlettPackard/squest",
+      "datasourceTemplate": "github-releases"
     }
   ],
   "packageRules": [
@@ -58,6 +70,14 @@
       "groupName": "External Secrets",
       "matchPackageNames": [
         "/external-secrets/"
+      ]
+    },
+    {
+      "description": "Group Squest-related updates",
+      "groupName": "Squest",
+      "matchPackageNames": [
+        "HewlettPackard/squest",
+        "ghcr.io/amasolov/squest"
       ]
     }
   ]

@@ -7,3 +7,4 @@ resources:
   - ./tailscale/ks.yaml
   - ./cloudnative-pg/ks.yaml
   - ./awx/ks.yaml
+  - ./squest/ks.yaml

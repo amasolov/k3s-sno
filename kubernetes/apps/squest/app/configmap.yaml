@@ -1,0 +1,26 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: squest-config
+  namespace: squest
+data:
+  DATABASE: "psql"
+  DB_HOST: "awx-db-rw.cnpg-system.svc"
+  DB_PORT: "5432"
+  DB_DATABASE: "squest_db"
+  DB_USER: "squest"
+  RABBITMQ_USER: "squest"
+  RABBITMQ_HOST: "squest-rabbitmq"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_VHOST: "squest"
+  REDIS_CACHE_HOST: "squest-redis"
+  REDIS_CACHE_PORT: "6379"
+  REDIS_CACHE_USER: "default"
+  DEBUG: "false"
+  GUNICORN_WORKERS: "2"
+  SQUEST_HOST: "http://ktmb1-g-srv-003.iot.ktmb1.net:30081"
+  SQUEST_EMAIL_HOST: "squest@ktmb1-g-srv-003.iot.ktmb1.net"
+  TZ: "Australia/Sydney"
+  ALLOWED_HOSTS: "*"
+  CSRF_TRUSTED_ORIGINS: "http://ktmb1-g-srv-003.iot.ktmb1.net:30081,http://127.0.0.1:8000,http://localhost:8000"
