@@ -123,11 +123,16 @@ kubectl -n awx logs -f deployment/awx-operator-controller-manager
 
 ## 6. Build Squest ARM64 Image
 
-The official Squest image is amd64-only. A GitHub Actions workflow builds an ARM64 image:
+The official Squest image is amd64-only and MySQL-only. A GitHub Actions workflow builds
+a patched ARM64 image with PostgreSQL support:
 
 1. Go to **Actions** > **Build Squest ARM64** in your GitHub repo
 2. Click **Run workflow** (defaults to the latest Squest release)
 3. The image is pushed to `ghcr.io/amasolov/squest:<version>` and `:latest`
+
+The build patches Squest to:
+- Accept a `DB_ENGINE` env var (defaults to MySQL for backward compatibility)
+- Fix MySQL-specific SQL in migrations for PostgreSQL compatibility
 
 This also runs weekly on a schedule to pick up new releases.
 

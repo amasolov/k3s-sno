@@ -53,6 +53,52 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Patch for PostgreSQL support
+        run: |
+          # 1. Make the default DB engine configurable via DB_ENGINE env var
+          python3 << 'PYEOF'
+          import re
+
+          with open('Squest/settings.py') as f:
+              content = f.read()
+
+          content = content.replace(
+              "'ENGINE': \"django.db.backends.mysql\",",
+              "'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.mysql'),"
+          )
+          content = content.replace(
+              "'OPTIONS': {'charset': 'utf8mb4'}",
+              "**({'OPTIONS': {'charset': 'utf8mb4'}} if 'mysql' in os.environ.get('DB_ENGINE', 'mysql') else {})"
+          )
+
+          with open('Squest/settings.py', 'w') as f:
+              f.write(content)
+          print('Patched settings.py')
+          PYEOF
+
+          # 2. Fix MySQL-specific double-quoted strings in RunSQL migrations
+          python3 << 'PYEOF'
+          import re, glob
+
+          for filepath in glob.glob('**/migrations/*.py', recursive=True):
+              with open(filepath) as f:
+                  content = f.read()
+              if 'RunSQL' not in content:
+                  continue
+              original = content
+              def fix_runsql(match):
+                  inner = match.group(1)
+                  if '"' not in inner:
+                      return match.group(0)
+                  inner = inner.replace('"', "'")
+                  return f'RunSQL("{inner}")'
+              content = re.sub(r"RunSQL\('((?:[^'\\]|\\.)*)'\)", fix_runsql, content)
+              if content != original:
+                  with open(filepath, 'w') as f:
+                      f.write(content)
+                  print(f'Patched: {filepath}')
+          PYEOF
+
       - name: Extract version number
         id: semver
         run: |

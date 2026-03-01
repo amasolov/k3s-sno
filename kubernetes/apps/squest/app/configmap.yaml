@@ -5,7 +5,7 @@ metadata:
   name: squest-config
   namespace: squest
 data:
-  DATABASE: "psql"
+  DB_ENGINE: "django.db.backends.postgresql"
   DB_HOST: "awx-db-rw.cnpg-system.svc"
   DB_PORT: "5432"
   DB_DATABASE: "squest_db"
