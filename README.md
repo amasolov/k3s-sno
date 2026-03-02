@@ -192,7 +192,7 @@ k3s-sno/
 ├── .taskfiles/
 │   ├── ansible/Taskfile.yaml        # ansible:deps, ansible:k3s, ansible:awx-config
 │   ├── bootstrap/Taskfile.yaml      # bootstrap:age, bootstrap:secrets, bootstrap:flux
-│   ├── cluster/Taskfile.yaml        # cluster:nuke, cluster:rebuild, cluster:nuke-rebuild
+│   ├── cluster/Taskfile.yaml        # cluster:nuke, cluster:wait, cluster:init-fresh
 │   ├── flux/Taskfile.yaml           # flux:reconcile, flux:status, flux:logs, flux:hr
 │   └── k8s/Taskfile.yaml            # k8s:pods, k8s:events, k8s:logs, k8s:nodes
 ├── ansible/
@@ -241,9 +241,9 @@ k3s-sno/
 | `task cluster:install` | Install k3s and fetch kubeconfig |
 | `task cluster:bootstrap` | Create secrets + bootstrap Flux |
 | `task cluster:wait` | Wait for Flux and AWX to become ready |
-| `task cluster:rebuild` | Full rebuild (install → bootstrap → wait), restores DB from R2 |
-| `task cluster:nuke-rebuild` | Destroy cluster and rebuild from scratch, restores DB from R2 |
 | `task cluster:init-fresh` | First-time setup: create empty DB (no R2 backup needed) |
+| `task rebuild` | Full rebuild (install → bootstrap → wait), restores DB from R2 |
+| `task nuke-rebuild` | Destroy cluster and rebuild from scratch, restores DB from R2 |
 | `task reconcile` | Shortcut for `flux:reconcile` |
 
 ## Nuke & Rebuild
@@ -251,16 +251,14 @@ k3s-sno/
 The CNPG cluster is configured to **automatically restore from the latest R2 backup** when recreated. After a nuke, your AWX data comes back seamlessly.
 
 ```bash
-task cluster:nuke-rebuild
+task nuke-rebuild
 ```
 
 Or run each phase individually:
 
 ```bash
 task cluster:nuke           # uninstall k3s, delete kubeconfig
-task cluster:install        # reinstall k3s, fetch new kubeconfig
-task cluster:bootstrap      # create ESO secret + bootstrap Flux
-task cluster:wait           # poll until Flux and AWX are healthy
+task rebuild                # reinstall k3s, bootstrap Flux, wait for readiness
 task ansible:awx-config     # configure AWX once it's ready
 ```
 
@@ -277,7 +275,7 @@ If the R2 bucket is empty (no prior backup exists), the recovery bootstrap will 
 ```bash
 task cluster:install
 task cluster:bootstrap
-task cluster:init-fresh     # creates empty DB, triggers first backup
+task cluster:init-fresh      # creates empty DB, triggers first backup
 task cluster:wait
 task ansible:awx-config
 ```
@@ -312,5 +310,5 @@ task k8s:logs NS=external-secrets POD=<eso-pod>
 kubectl -n awx annotate externalsecret awx-admin-password force-sync=$(date +%s) --overwrite
 
 # Nuclear option — wipe and rebuild everything
-task cluster:nuke-rebuild
+task nuke-rebuild
 ```

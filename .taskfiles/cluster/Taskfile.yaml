@@ -19,21 +19,6 @@ tasks:
       - which ansible-playbook
       - test -f {{.ANSIBLE_DIR}}/playbooks/k3s-nuke.yml
 
-  install:
-    desc: Install k3s on the Pi and fetch kubeconfig
-    cmds:
-      - task: ::ansible:k3s
-    preconditions:
-      - which ansible-playbook
-
-  bootstrap:
-    desc: Create in-cluster secrets and bootstrap Flux
-    cmds:
-      - task: ::bootstrap:secrets
-      - task: ::bootstrap:flux
-    preconditions:
-      - test -f {{.ROOT_DIR}}/kubeconfig
-
   wait:
     desc: Wait for core services to become ready
     cmds:
@@ -83,17 +68,3 @@ tasks:
       - which kubectl
       - test -f {{.ROOT_DIR}}/kubernetes/apps/cloudnative-pg/cluster/cluster-initdb.yaml
 
-  rebuild:
-    desc: Full rebuild — install k3s, bootstrap Flux, wait for readiness (restores DB from R2)
-    cmds:
-      - task: install
-      - task: bootstrap
-      - task: wait
-      - echo "Cluster rebuilt (DB restored from R2). Run 'task ansible:awx-config' once AWX is ready."
-
-  nuke-rebuild:
-    desc: Nuke the cluster and rebuild from scratch (restores DB from R2)
-    prompt: ⚠️  This will DESTROY and REBUILD the cluster. Continue?
-    cmds:
-      - task: nuke
-      - task: rebuild
