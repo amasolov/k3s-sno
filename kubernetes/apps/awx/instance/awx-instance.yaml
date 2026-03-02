@@ -21,6 +21,9 @@ spec:
     - setting: UI_NEXT
       value: "True"
 
+  uwsgi_processes: 2
+  uwsgi_listen_queue_size: 64
+
   projects_persistence: true
   projects_storage_class: local-path
   projects_storage_size: 8Gi
