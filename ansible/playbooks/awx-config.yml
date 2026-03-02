@@ -298,6 +298,10 @@
       loop: "{{ awx_inventory_sources }}"
       loop_control:
         label: "{{ item.name }}"
+      retries: 3
+      delay: 30
+      register: _inv_sync
+      until: _inv_sync is not failed
 
     # ── 7. Job templates ──────────────────────────────────
     - name: Configure job templates
