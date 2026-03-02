@@ -1,0 +1,45 @@
+---
+- name: Uninstall k3s and clean up node
+  hosts: k3s
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Check for k3s-uninstall script
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s-uninstall.sh
+      register: uninstall_script
+
+    - name: Run k3s-uninstall.sh
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s-uninstall.sh
+      when: uninstall_script.stat.exists
+      changed_when: true
+
+    - name: Remove k3s data directory
+      ansible.builtin.file:
+        path: /var/lib/rancher
+        state: absent
+
+    - name: Remove k3s config directory
+      ansible.builtin.file:
+        path: /etc/rancher
+        state: absent
+
+    - name: Remove CNI directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/cni
+        - /etc/cni
+
+    - name: Prune unused container images
+      ansible.builtin.command:
+        cmd: crictl rmi --prune
+      failed_when: false
+      changed_when: false
+
+    - name: Display result
+      ansible.builtin.debug:
+        msg: "k3s has been removed from {{ inventory_hostname }}. Node is ready for reinstall."

@@ -1,0 +1,37 @@
+---
+version: '3'
+
+tasks:
+
+  reconcile:
+    desc: Force Flux to pull in changes from Git
+    cmds:
+      - flux reconcile source git flux-system --namespace flux-system
+      - flux reconcile kustomization flux-system --namespace flux-system --with-source
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which flux
+
+  status:
+    desc: Show Flux Kustomization and HelmRelease status
+    cmds:
+      - flux get kustomizations --all-namespaces
+      - echo "---"
+      - flux get helmreleases --all-namespaces
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which flux
+
+  hr:
+    desc: Show all HelmReleases across namespaces
+    cmd: flux get helmreleases --all-namespaces
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which flux
+
+  logs:
+    desc: Tail Flux controller logs
+    cmd: flux logs --follow --level=info
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which flux

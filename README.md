@@ -7,20 +7,57 @@ GitOps-driven single-node k3s cluster running [AWX](https://github.com/ansible/a
 | Kubernetes | k3s |
 | GitOps | Flux |
 | Secrets | External Secrets Operator + AWS Secrets Manager |
+| Local Secrets | SOPS + age |
 | Storage | k3s local-path provisioner |
 | Database | CloudNativePG (PostgreSQL) with R2 backups |
 | Automation | AWX (Ansible Automation Platform) |
 | Network | Tailscale Operator |
+| Dev Env | mise + Taskfile |
 
 ## Prerequisites
 
 - Raspberry Pi with Ubuntu/Debian (ARM64) accessible at `ktmb1-g-srv-003.iot.ktmb1.net`
 - SSH key-based access configured for the target host
 - [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) installed locally
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) installed locally
-- [Flux CLI](https://fluxcd.io/flux/installation/#install-the-flux-cli) installed locally
+- [mise](https://mise.jdx.dev/) installed and activated in your shell
 - GitHub account with a personal access token (for Flux bootstrap)
 - AWS account with access to Secrets Manager
+
+## Developer Setup
+
+All CLI tools (kubectl, flux, helm, sops, age, task, yq, jq) are managed by mise. One-time setup:
+
+```bash
+mise trust && mise install
+```
+
+Generate an age key for SOPS encryption (one-time):
+
+```bash
+task bootstrap:age
+```
+
+Copy the public key printed to stdout into `.sops.yaml`, replacing the placeholder.
+
+Edit `.env.sops.yaml` with a regular editor and fill in your actual secret values:
+
+```bash
+nano .env.sops.yaml
+```
+
+Then encrypt the file in place (first time only):
+
+```bash
+sops --encrypt --in-place .env.sops.yaml
+```
+
+From this point on, use `sops .env.sops.yaml` to edit -- it decrypts into your editor and re-encrypts on save.
+
+List all available tasks:
+
+```bash
+task --list
+```
 
 ## 1. Prepare AWS Secrets
 
@@ -32,6 +69,8 @@ Create the following secrets in AWS Secrets Manager:
 | `k3s-sno/awx/postgres-password` | PostgreSQL database password |
 | `k3s-sno/awx/secret-key` | AWX secret key for encryption |
 | `k3s-sno/awx/ssh-private-key` | SSH private key for managed hosts |
+| `k3s-sno/tailscale/oauth-client-id` | Tailscale OAuth client ID (for dynamic inventory) |
+| `k3s-sno/tailscale/oauth-client-secret` | Tailscale OAuth client secret (for dynamic inventory) |
 
 ```bash
 aws secretsmanager create-secret --name k3s-sno/awx/admin-password \
@@ -45,50 +84,44 @@ aws secretsmanager create-secret --name k3s-sno/awx/secret-key \
 
 aws secretsmanager create-secret --name k3s-sno/awx/ssh-private-key \
   --secret-string "$(cat ~/.ssh/id_ed25519)"
+
+aws secretsmanager create-secret --name k3s-sno/tailscale/oauth-client-id \
+  --secret-string "your-oauth-client-id"
+
+aws secretsmanager create-secret --name k3s-sno/tailscale/oauth-client-secret \
+  --secret-string "tskey-client-..."
 ```
 
 ## 2. Install k3s
 
 ```bash
-cd ansible
-ansible-galaxy collection install -r requirements.yml
-ansible-playbook playbooks/k3s-install.yml
+task ansible:deps
+task ansible:k3s
 ```
 
-After installation, set up your kubeconfig:
+After installation, verify the node (mise automatically sets `KUBECONFIG`):
 
 ```bash
-export KUBECONFIG=$(pwd)/kubeconfig
 kubectl get nodes
 ```
 
 ## 3. Create AWS Credentials Bootstrap Secret
 
-This secret is required by the External Secrets Operator to authenticate with AWS Secrets Manager. It must be created manually before Flux deploys ESO.
+This secret is required by the External Secrets Operator to authenticate with AWS Secrets Manager. It must be created before Flux deploys ESO.
 
 ```bash
-kubectl create namespace external-secrets
-
-kubectl create secret generic aws-credentials \
-  --namespace external-secrets \
-  --from-literal=access-key-id=YOUR_AWS_ACCESS_KEY_ID \
-  --from-literal=secret-access-key=YOUR_AWS_SECRET_ACCESS_KEY
+task bootstrap:secrets
 ```
 
 ## 4. Push to GitHub and Bootstrap Flux
 
 ```bash
-# Push this repo to GitHub
-git remote add origin git@github.com:YOUR_USER/k3s-sno.git
+# Push this repo to GitHub (first time only)
+git remote add origin git@github.com:amasolov/k3s-sno.git
 git push -u origin main
 
 # Bootstrap Flux
-flux bootstrap github \
-  --owner=YOUR_USER \
-  --repository=k3s-sno \
-  --path=kubernetes/bootstrap/flux \
-  --personal \
-  --branch=main
+task bootstrap:flux
 ```
 
 Flux will:
@@ -100,14 +133,17 @@ Flux will:
 ## 5. Monitor Deployment
 
 ```bash
-# Watch Flux reconciliation
-flux get kustomizations --watch
+# Flux status (Kustomizations + HelmReleases)
+task flux:status
 
-# Check AWX namespace
-kubectl -n awx get pods --watch
+# Watch pods across all namespaces
+task k8s:pods
 
-# Check AWX operator logs
-kubectl -n awx logs -f deployment/awx-operator-controller-manager
+# Tail Flux logs
+task flux:logs
+
+# AWX-specific events
+task k8s:events NS=awx
 ```
 
 ## 6. Configure AWX (Infrastructure as Code)
@@ -115,19 +151,23 @@ kubectl -n awx logs -f deployment/awx-operator-controller-manager
 AWX configuration is defined as code in `ansible/playbooks/awx-config.yml`. The playbook uses the `awx.awx` collection to create all resources (organizations, projects, inventories, credentials, job templates, etc.) via the AWX REST API.
 
 ```bash
-cd ansible
-ansible-galaxy collection install -r requirements.yml
-ansible-playbook -i inventory/awx_config.yml playbooks/awx-config.yml
+task ansible:awx-config
 ```
 
 This creates:
-- **Home Ops** organization with a **Home Lab** inventory
+- **KTMB1** organization with **Home Lab** and **Home Assistant** inventories
+- **Home Assistant** inventory is dynamically populated from the Tailscale API, grouped by ACL tags
 - **Home Lab SSH** machine credential (key from AWS Secrets Manager)
-- **Home Ops** project pointing at this Git repo
+- **KTMB1** project pointing at this Git repo
 - **Install k3s** job template
 - **AWX Self-Configure** job template (so AWX can re-apply its own config)
 
-To add resources, edit the variable lists in `awx-config.yml` and re-run.
+Tag your Tailscale devices by function to have them auto-grouped in the inventory:
+- `tag:ha-server` -> group `ha_server`
+- `tag:display-pi` -> group `display_pi`
+- Add any custom tags as needed; `tag:foo-bar` becomes group `foo_bar`
+
+To add resources, edit the variable lists in `awx-config.yml` and re-run `task ansible:awx-config`.
 
 The self-configure job template lets AWX re-run this playbook against itself. It requires an Execution Environment with the `awx.awx` and `amazon.aws` collections installed.
 
@@ -135,7 +175,7 @@ The self-configure job template lets AWX re-run this playbook against itself. It
 
 Once all pods are running:
 
-**AWX:** `http://ktmb1-g-srv-003.iot.ktmb1.net:30080`
+**AWX:** `https://awx.ktmb1.net` (via NGINX Proxy Manager -> `http://ktmb1-g-srv-003:30080`)
 - **Username:** `admin`
 - **Password:** The value stored in `k3s-sno/awx/admin-password` in AWS Secrets Manager
 
@@ -143,27 +183,91 @@ Once all pods are running:
 
 ```
 k3s-sno/
-├── ansible/                          # Ansible automation
-│   ├── ansible.cfg
-│   ├── requirements.yml              # Galaxy collections (awx.awx, amazon.aws, etc.)
-│   ├── inventory/
-│   │   ├── hosts.yml                 # Managed host inventory
-│   │   └── awx_config.yml           # AWX API connection for config-as-code
-│   └── playbooks/
-│       ├── k3s-install.yml           # k3s cluster installation
-│       └── awx-config.yml           # AWX configuration as code
-├── kubernetes/
-│   ├── bootstrap/flux/               # Flux bootstrap (GitRepo + sync)
-│   ├── flux/config/                  # Top-level cluster Kustomization
-│   └── apps/
-│       ├── external-secrets/         # ESO operator + ClusterSecretStore
-│       ├── cloudnative-pg/           # CNPG operator + shared PostgreSQL cluster
-│       ├── coredns/                  # Custom CoreDNS config (Tailscale MagicDNS)
-│       ├── tailscale/               # Tailscale Operator
-│       └── awx/                      # AWX Operator + AWX instance
+├── .editorconfig                    # Editor formatting rules
+├── .env.sops.yaml                   # Encrypted local secrets (AWS, GitHub)
 ├── .gitignore
+├── .mise.toml                       # Tool versions (kubectl, flux, sops, etc.)
+├── .sops.yaml                       # SOPS encryption rules
+├── Taskfile.yaml                    # Root task runner
+├── .taskfiles/
+│   ├── ansible/Taskfile.yaml        # ansible:deps, ansible:k3s, ansible:awx-config
+│   ├── bootstrap/Taskfile.yaml      # bootstrap:age, bootstrap:secrets, bootstrap:flux
+│   ├── cluster/Taskfile.yaml        # cluster:nuke, cluster:rebuild, cluster:nuke-rebuild
+│   ├── flux/Taskfile.yaml           # flux:reconcile, flux:status, flux:logs, flux:hr
+│   └── k8s/Taskfile.yaml            # k8s:pods, k8s:events, k8s:logs, k8s:nodes
+├── ansible/
+│   ├── ansible.cfg
+│   ├── requirements.yml             # Galaxy collections (awx.awx, amazon.aws, etc.)
+│   ├── inventory/
+│   │   ├── hosts.yml                # Managed host inventory
+│   │   ├── awx_config.yml          # AWX API connection for config-as-code
+│   │   └── tailscale_inventory.py  # Dynamic inventory from Tailscale API
+│   └── playbooks/
+│       ├── k3s-install.yml          # k3s cluster installation
+│       ├── k3s-nuke.yml             # k3s uninstall and cleanup
+│       └── awx-config.yml          # AWX configuration as code
+├── kubernetes/
+│   ├── bootstrap/flux/              # Flux bootstrap (GitRepo + sync)
+│   ├── flux/config/                 # Top-level cluster Kustomization
+│   └── apps/
+│       ├── external-secrets/        # ESO operator + ClusterSecretStore
+│       ├── cloudnative-pg/          # CNPG operator + shared PostgreSQL cluster
+│       ├── coredns/                 # Custom CoreDNS config (Tailscale MagicDNS)
+│       ├── tailscale/              # Tailscale Operator
+│       └── awx/                     # AWX Operator + AWX instance
+├── renovate.json
 └── README.md
 ```
+
+## Task Reference
+
+| Task | Description |
+|------|-------------|
+| `task ansible:deps` | Install Ansible Galaxy collections |
+| `task ansible:k3s` | Run k3s install playbook |
+| `task ansible:awx-config` | Apply AWX configuration as code |
+| `task bootstrap:age` | Generate age key pair (one-time) |
+| `task bootstrap:secrets` | Create ESO bootstrap secret in-cluster |
+| `task bootstrap:flux` | Bootstrap Flux into the cluster |
+| `task flux:reconcile` | Force Flux to reconcile from Git |
+| `task flux:status` | Show Kustomization + HelmRelease status |
+| `task flux:hr` | Show all HelmReleases |
+| `task flux:logs` | Tail Flux controller logs |
+| `task k8s:pods` | Get pods (all NS, or `NS=awx`) |
+| `task k8s:events NS=<ns>` | Get events for a namespace |
+| `task k8s:logs NS=<ns> POD=<pod>` | Tail pod logs |
+| `task k8s:nodes` | Show node status and resource usage |
+| `task cluster:nuke` | Uninstall k3s and remove local kubeconfig |
+| `task cluster:install` | Install k3s and fetch kubeconfig |
+| `task cluster:bootstrap` | Create secrets + bootstrap Flux |
+| `task cluster:wait` | Wait for Flux and AWX to become ready |
+| `task cluster:rebuild` | Full rebuild (install → bootstrap → wait) |
+| `task cluster:nuke-rebuild` | Destroy cluster and rebuild from scratch |
+| `task reconcile` | Shortcut for `flux:reconcile` |
+
+## Nuke & Rebuild
+
+To completely destroy and recreate the cluster from scratch:
+
+```bash
+task cluster:nuke-rebuild
+```
+
+Or run each phase individually:
+
+```bash
+task cluster:nuke           # uninstall k3s, delete kubeconfig
+task cluster:install        # reinstall k3s, fetch new kubeconfig
+task cluster:bootstrap      # create ESO secret + bootstrap Flux
+task cluster:wait           # poll until Flux and AWX are healthy
+task ansible:awx-config     # configure AWX once it's ready
+```
+
+The nuke step runs the `k3s-nuke.yml` playbook which:
+1. Executes `k3s-uninstall.sh` on the Pi
+2. Removes leftover data directories (`/var/lib/rancher`, `/etc/rancher`, CNI)
+3. Prunes container images
+4. Deletes the local kubeconfig
 
 ## Updating
 
@@ -171,31 +275,27 @@ All changes are GitOps-driven. To modify the deployment:
 
 1. Edit the relevant YAML files in `kubernetes/apps/`
 2. Commit and push to `main`
-3. Flux will automatically reconcile changes (within ~10 minutes, or force with `flux reconcile source git flux-system`)
+3. Flux will automatically reconcile changes (within ~10 minutes, or force with `task reconcile`)
 
 ## Troubleshooting
 
-**Flux not reconciling:**
 ```bash
-flux get sources git
-flux get kustomizations
-flux logs
-```
+# Flux not reconciling
+task flux:status
+task flux:logs
 
-**AWX pods not starting:**
-```bash
-kubectl -n awx describe pod <pod-name>
-kubectl -n awx get events --sort-by='.lastTimestamp'
-```
+# AWX pods not starting
+task k8s:events NS=awx
+task k8s:logs NS=awx POD=<pod-name>
 
-**ExternalSecret not syncing:**
-```bash
+# ExternalSecret not syncing
 kubectl -n awx get externalsecrets
-kubectl -n external-secrets logs -f deployment/external-secrets
-```
+task k8s:logs NS=external-secrets POD=<eso-pod>
 
-**Reset AWX admin password:**
-Update the secret value in AWS Secrets Manager, then force a refresh:
-```bash
+# Reset AWX admin password
+# Update the value in AWS Secrets Manager, then:
 kubectl -n awx annotate externalsecret awx-admin-password force-sync=$(date +%s) --overwrite
+
+# Nuclear option — wipe and rebuild everything
+task cluster:nuke-rebuild
 ```

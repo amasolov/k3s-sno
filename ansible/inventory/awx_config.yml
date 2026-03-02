@@ -5,10 +5,9 @@ all:
       ansible_connection: local
       ansible_python_interpreter: "{{ ansible_playbook_python }}"
 
-      # When running from laptop (bootstrap), override with:
-      #   -e controller_host=http://ktmb1-g-srv-003.iot.ktmb1.net:30080
+      # External URL via NGINX Proxy Manager reverse proxy.
       # When running from AWX (self-config), the awx.awx collection
       # picks up CONTROLLER_HOST / CONTROLLER_OAUTH_TOKEN from env automatically.
-      controller_host: "http://ktmb1-g-srv-003.iot.ktmb1.net:30080"
+      controller_host: "https://awx.ktmb1.net"
       controller_username: admin
       # Password fetched from AWS SM at runtime in the playbook

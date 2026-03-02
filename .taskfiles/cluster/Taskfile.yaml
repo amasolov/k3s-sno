@@ -1,0 +1,74 @@
+---
+version: '3'
+
+vars:
+  ANSIBLE_DIR: '{{.ROOT_DIR}}/ansible'
+  PI_HOST: ktmb1-g-srv-003.iot.ktmb1.net
+
+tasks:
+
+  nuke:
+    desc: Uninstall k3s from the Pi and remove local kubeconfig
+    prompt: ⚠️  This will DESTROY the cluster. Continue?
+    cmds:
+      - ansible-playbook -i {{.ANSIBLE_DIR}}/inventory/hosts.yml {{.ANSIBLE_DIR}}/playbooks/k3s-nuke.yml
+      - rm -f {{.ROOT_DIR}}/kubeconfig
+      - echo "Cluster nuked. Run 'task cluster:rebuild' to start fresh."
+    dir: '{{.ANSIBLE_DIR}}'
+    preconditions:
+      - which ansible-playbook
+      - test -f {{.ANSIBLE_DIR}}/playbooks/k3s-nuke.yml
+
+  install:
+    desc: Install k3s on the Pi and fetch kubeconfig
+    cmds:
+      - task: ansible:k3s
+    preconditions:
+      - which ansible-playbook
+
+  bootstrap:
+    desc: Create in-cluster secrets and bootstrap Flux
+    cmds:
+      - task: bootstrap:secrets
+      - task: bootstrap:flux
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+
+  wait:
+    desc: Wait for core services to become ready
+    cmds:
+      - echo "Waiting for Flux kustomizations to reconcile..."
+      - |
+        for i in $(seq 1 60); do
+          ready=$(kubectl get kustomizations.kustomize.toolkit.fluxcd.io -A --no-headers 2>/dev/null | grep -c "True" || true)
+          total=$(kubectl get kustomizations.kustomize.toolkit.fluxcd.io -A --no-headers 2>/dev/null | wc -l | tr -d ' ')
+          echo "  [$i/60] Kustomizations ready: $ready/$total"
+          if [ "$total" -gt 0 ] && [ "$ready" -eq "$total" ]; then
+            echo "All Flux kustomizations reconciled."
+            break
+          fi
+          sleep 30
+        done
+      - echo "Waiting for AWX pods to be ready..."
+      - kubectl wait --for=condition=ready pod -l app.kubernetes.io/managed-by=awx-operator -n awx --timeout=600s 2>/dev/null || echo "AWX pods not ready yet (may still be deploying)."
+      - echo "--- Cluster status ---"
+      - kubectl get nodes -o wide
+      - kubectl get pods -A
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which kubectl
+
+  rebuild:
+    desc: Full rebuild — install k3s, bootstrap Flux, wait for readiness
+    cmds:
+      - task: cluster:install
+      - task: cluster:bootstrap
+      - task: cluster:wait
+      - echo "Cluster rebuilt. Run 'task ansible:awx-config' once AWX is ready."
+
+  nuke-rebuild:
+    desc: Nuke the cluster and rebuild from scratch
+    prompt: ⚠️  This will DESTROY and REBUILD the cluster. Continue?
+    cmds:
+      - task: cluster:nuke
+      - task: cluster:rebuild

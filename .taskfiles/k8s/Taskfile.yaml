@@ -1,0 +1,43 @@
+---
+version: '3'
+
+tasks:
+
+  pods:
+    desc: Get pods (all namespaces, or NS=<namespace>)
+    cmd: kubectl get pods {{if .NS}}-n {{.NS}}{{else}}-A{{end}} -o wide
+    vars:
+      NS: '{{.NS | default ""}}'
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which kubectl
+
+  events:
+    desc: Get events sorted by time (NS=<namespace> required)
+    cmd: kubectl -n {{.NS}} get events --sort-by='.lastTimestamp'
+    requires:
+      vars: [NS]
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which kubectl
+
+  logs:
+    desc: Tail pod logs (NS=<namespace> POD=<pod-name>)
+    cmd: kubectl -n {{.NS}} logs -f {{.POD}} {{if .CONTAINER}}-c {{.CONTAINER}}{{end}}
+    vars:
+      CONTAINER: '{{.CONTAINER | default ""}}'
+    requires:
+      vars: [NS, POD]
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which kubectl
+
+  nodes:
+    desc: Show node status and resource usage
+    cmds:
+      - kubectl get nodes -o wide
+      - echo "---"
+      - kubectl top nodes
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which kubectl

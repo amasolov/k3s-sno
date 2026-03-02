@@ -1,0 +1,33 @@
+---
+version: '3'
+
+set: [pipefail]
+
+vars:
+  ANSIBLE_DIR: '{{.ROOT_DIR}}/ansible'
+  KUBERNETES_DIR: '{{.ROOT_DIR}}/kubernetes'
+
+env:
+  KUBECONFIG: '{{.ROOT_DIR}}/kubeconfig'
+  SOPS_AGE_KEY_FILE: '{{.ROOT_DIR}}/age.key'
+  ANSIBLE_CONFIG: '{{.ANSIBLE_DIR}}/ansible.cfg'
+
+includes:
+  ansible: .taskfiles/ansible
+  bootstrap: .taskfiles/bootstrap
+  cluster: .taskfiles/cluster
+  flux: .taskfiles/flux
+  k8s: .taskfiles/k8s
+
+tasks:
+
+  default:
+    silent: true
+    cmd: task --list
+
+  reconcile:
+    desc: Force Flux to reconcile from Git
+    cmd: flux reconcile source git flux-system --namespace flux-system
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which flux

@@ -31,7 +31,7 @@
 
     # ━━━ Organizations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_organizations:
-      - name: Home Ops
+      - name: KTMB1
         description: Home infrastructure automation
 
     # ━━━ Credential Types (custom) ━━━━━━━━━━━━━━━━━━━━━
@@ -56,10 +56,27 @@
             CONTROLLER_USERNAME: !unsafe "{{ username }}"
             CONTROLLER_PASSWORD: !unsafe "{{ password }}"
 
+      - name: Tailscale OAuth
+        kind: cloud
+        inputs:
+          fields:
+            - id: client_id
+              type: string
+              label: OAuth Client ID
+            - id: client_secret
+              type: string
+              label: OAuth Client Secret
+              secret: true
+        injectors:
+          env:
+            TS_OAUTH_CLIENT_ID: !unsafe "{{ client_id }}"
+            TS_OAUTH_CLIENT_SECRET: !unsafe "{{ client_secret }}"
+            TAILSCALE_TAILNET: "-"
+
     # ━━━ Credentials ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_credentials:
       - name: Home Lab SSH
-        organization: Home Ops
+        organization: KTMB1
         credential_type: Machine
         inputs:
           username: amasolov
@@ -67,7 +84,7 @@
             {{ lookup('amazon.aws.aws_secret', 'k3s-sno/awx/ssh-private-key', region=aws_region) }}
 
       - name: AWX Controller
-        organization: Home Ops
+        organization: KTMB1
         credential_type: AWX Controller
         inputs:
           host: http://awx-service.awx.svc:80
@@ -76,16 +93,25 @@
             {{ lookup('amazon.aws.aws_secret', 'k3s-sno/awx/admin-password', region=aws_region) }}
 
       - name: AWS
-        organization: Home Ops
+        organization: KTMB1
         credential_type: Amazon Web Services
         inputs:
           username: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
           password: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
 
+      - name: Tailscale OAuth
+        organization: KTMB1
+        credential_type: Tailscale OAuth
+        inputs:
+          client_id: >-
+            {{ lookup('amazon.aws.aws_secret', 'k3s-sno/tailscale/oauth-client-id', region=aws_region) }}
+          client_secret: >-
+            {{ lookup('amazon.aws.aws_secret', 'k3s-sno/tailscale/oauth-client-secret', region=aws_region) }}
+
     # ━━━ Projects ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_projects:
-      - name: Home Ops
-        organization: Home Ops
+      - name: KTMB1
+        organization: KTMB1
         scm_type: git
         scm_url: https://github.com/amasolov/k3s-sno.git
         scm_branch: main
@@ -94,7 +120,7 @@
     # ━━━ Inventories ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_inventories:
       - name: Home Lab
-        organization: Home Ops
+        organization: KTMB1
         hosts:
           - name: ktmb1-g-srv-003
             variables:
@@ -102,18 +128,36 @@
               ansible_user: amasolov
 
       - name: AWX Controller
-        organization: Home Ops
+        organization: KTMB1
         description: Localhost for AWX self-configuration
         hosts:
           - name: localhost
             variables:
               ansible_connection: local
 
+      - name: Home Assistant
+        organization: KTMB1
+        description: >-
+          Tailscale-connected Home Assistant hosts and related devices.
+          Populated dynamically from the Tailscale API; hosts are grouped
+          by ACL tag (tag:ha-server → ha_server, tag:display-pi → display_pi, etc.).
+
+    # ━━━ Inventory Sources ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    awx_inventory_sources:
+      - name: Tailscale
+        inventory: Home Assistant
+        source: scm
+        source_project: KTMB1
+        source_path: ansible/inventory/tailscale_inventory.py
+        credential: Tailscale OAuth
+        update_on_launch: true
+        overwrite: true
+
     # ━━━ Job Templates ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_job_templates:
       - name: Install k3s
-        organization: Home Ops
-        project: Home Ops
+        organization: KTMB1
+        project: KTMB1
         playbook: ansible/playbooks/k3s-install.yml
         inventory: Home Lab
         credentials:
@@ -121,8 +165,8 @@
         become_enabled: true
 
       - name: AWX Self-Configure
-        organization: Home Ops
-        project: Home Ops
+        organization: KTMB1
+        project: KTMB1
         playbook: ansible/playbooks/awx-config.yml
         inventory: AWX Controller
         credentials:
@@ -221,7 +265,23 @@
       loop_control:
         label: "{{ item.0.name }}/{{ item.1.name }}"
 
-    # ── 6. Job templates ────────────────────────────────
+    # ── 6. Inventory sources ──────────────────────────────
+    - name: Configure inventory sources
+      awx.awx.inventory_source:
+        name: "{{ item.name }}"
+        inventory: "{{ item.inventory }}"
+        source: "{{ item.source }}"
+        source_project: "{{ item.source_project | default(omit) }}"
+        source_path: "{{ item.source_path | default(omit) }}"
+        credential: "{{ item.credential | default(omit) }}"
+        update_on_launch: "{{ item.update_on_launch | default(true) }}"
+        overwrite: "{{ item.overwrite | default(true) }}"
+        state: present
+      loop: "{{ awx_inventory_sources }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ── 7. Job templates ──────────────────────────────────
     - name: Configure job templates
       awx.awx.job_template:
         name: "{{ item.name }}"
@@ -238,7 +298,7 @@
       loop_control:
         label: "{{ item.name }}"
 
-    # ── 7. Workflow templates ───────────────────────────
+    # ── 8. Workflow templates ───────────────────────────
     - name: Configure workflow templates
       awx.awx.workflow_job_template:
         name: "{{ item.name }}"
@@ -249,7 +309,7 @@
       loop_control:
         label: "{{ item.name }}"
 
-    # ── 8. Schedules ────────────────────────────────────
+    # ── 9. Schedules ────────────────────────────────────
     - name: Configure schedules
       awx.awx.schedule:
         name: "{{ item.name }}"
@@ -261,7 +321,7 @@
       loop_control:
         label: "{{ item.name }}"
 
-    # ── 9. Notification templates ───────────────────────
+    # ── 10. Notification templates ──────────────────────
     - name: Configure notification templates
       awx.awx.notification_template:
         name: "{{ item.name }}"
@@ -273,7 +333,7 @@
       loop_control:
         label: "{{ item.name }}"
 
-    # ── 10. Teams ───────────────────────────────────────
+    # ── 11. Teams ───────────────────────────────────────
     - name: Configure teams
       awx.awx.team:
         name: "{{ item.name }}"
@@ -284,7 +344,7 @@
       loop_control:
         label: "{{ item.name }}"
 
-    # ── 11. Users ───────────────────────────────────────
+    # ── 12. Users ───────────────────────────────────────
     - name: Configure users
       awx.awx.user:
         username: "{{ item.username }}"

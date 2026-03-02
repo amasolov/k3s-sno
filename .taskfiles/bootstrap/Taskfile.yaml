@@ -1,0 +1,49 @@
+---
+version: '3'
+
+tasks:
+
+  age:
+    desc: Generate a new age key pair (one-time setup)
+    cmds:
+      - age-keygen -o {{.ROOT_DIR}}/age.key
+      - |
+        echo "Public key (paste into .sops.yaml):"
+        grep "public key" {{.ROOT_DIR}}/age.key
+    status:
+      - test -f {{.ROOT_DIR}}/age.key
+    preconditions:
+      - which age-keygen
+
+  secrets:
+    desc: Create ESO aws-credentials bootstrap secret in-cluster
+    cmds:
+      - kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -
+      - >-
+        sops exec-env {{.ROOT_DIR}}/.env.sops.yaml
+        'kubectl create secret generic aws-credentials
+        --namespace external-secrets
+        --from-literal=access-key-id=$AWS_ACCESS_KEY_ID
+        --from-literal=secret-access-key=$AWS_SECRET_ACCESS_KEY
+        --dry-run=client -o yaml | kubectl apply -f -'
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - test -f {{.ROOT_DIR}}/.env.sops.yaml
+      - test -f {{.SOPS_AGE_KEY_FILE}}
+      - which kubectl sops
+
+  flux:
+    desc: Bootstrap Flux into the cluster
+    cmd: >-
+      sops exec-env {{.ROOT_DIR}}/.env.sops.yaml
+      'flux bootstrap github
+      --owner=amasolov
+      --repository=k3s-sno
+      --path=kubernetes/bootstrap/flux
+      --personal
+      --branch=main'
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - test -f {{.ROOT_DIR}}/.env.sops.yaml
+      - test -f {{.SOPS_AGE_KEY_FILE}}
+      - which flux sops

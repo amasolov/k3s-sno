@@ -1,0 +1,32 @@
+---
+version: '3'
+
+tasks:
+
+  deps:
+    desc: Install Ansible Galaxy collections
+    dir: '{{.ANSIBLE_DIR}}'
+    cmd: ansible-galaxy collection install -r requirements.yml --force
+    preconditions:
+      - which ansible-galaxy
+      - test -f {{.ANSIBLE_DIR}}/requirements.yml
+
+  k3s:
+    desc: Run k3s install playbook against the Pi
+    dir: '{{.ANSIBLE_DIR}}'
+    cmd: ansible-playbook playbooks/k3s-install.yml
+    preconditions:
+      - which ansible-playbook
+      - test -f {{.ANSIBLE_DIR}}/playbooks/k3s-install.yml
+
+  awx-config:
+    desc: Apply AWX configuration as code (requires AWS creds)
+    dir: '{{.ANSIBLE_DIR}}'
+    cmd: >-
+      sops exec-env {{.ROOT_DIR}}/.env.sops.yaml
+      'ansible-playbook -i inventory/awx_config.yml playbooks/awx-config.yml'
+    preconditions:
+      - which ansible-playbook sops
+      - test -f {{.ROOT_DIR}}/.env.sops.yaml
+      - test -f {{.SOPS_AGE_KEY_FILE}}
+      - test -f {{.ANSIBLE_DIR}}/playbooks/awx-config.yml
