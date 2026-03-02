@@ -31,7 +31,6 @@ spec:
       cpu: 100m
       memory: 256Mi
     limits:
-      cpu: "1"
       memory: 1536Mi
 
   task_resource_requirements:
@@ -39,16 +38,15 @@ spec:
       cpu: 100m
       memory: 256Mi
     limits:
-      cpu: "1"
-      memory: 1Gi
+      memory: 1280Mi
 
   ee_resource_requirements:
     requests:
       cpu: 100m
       memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 250m
+      memory: 256Mi
 
   redis_resource_requirements:
     requests:
@@ -56,7 +54,7 @@ spec:
       memory: 32Mi
     limits:
       cpu: 250m
-      memory: 128Mi
+      memory: 64Mi
 
   rsyslog_resource_requirements:
     requests:
@@ -64,4 +62,4 @@ spec:
       memory: 32Mi
     limits:
       cpu: 250m
-      memory: 128Mi
+      memory: 256Mi
