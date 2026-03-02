@@ -12,6 +12,10 @@ spec:
     storageClass: local-path
     size: 8Gi
 
+  # Each nuke/rebuild cycle needs a unique serverName so new WALs don't
+  # collide with the old archive. Before nuking, run: task cluster:rotate
+  serverName: awx-db-v2
+
   # Restore from the latest R2 backup on cluster creation.
   # For a truly fresh start (no backup in R2), run: task cluster:init-fresh
   bootstrap:

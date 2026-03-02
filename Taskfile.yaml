@@ -45,5 +45,6 @@ tasks:
     desc: Nuke the cluster and rebuild from scratch (restores DB from R2)
     prompt: ⚠️  This will DESTROY and REBUILD the cluster. Continue?
     cmds:
+      - task: cluster:rotate
       - task: cluster:nuke
       - task: rebuild
