@@ -86,14 +86,14 @@ tasks:
   rebuild:
     desc: Full rebuild — install k3s, bootstrap Flux, wait for readiness (restores DB from R2)
     cmds:
-      - task: cluster:install
-      - task: cluster:bootstrap
-      - task: cluster:wait
+      - task: install
+      - task: bootstrap
+      - task: wait
       - echo "Cluster rebuilt (DB restored from R2). Run 'task ansible:awx-config' once AWX is ready."
 
   nuke-rebuild:
     desc: Nuke the cluster and rebuild from scratch (restores DB from R2)
     prompt: ⚠️  This will DESTROY and REBUILD the cluster. Continue?
     cmds:
-      - task: cluster:nuke
-      - task: cluster:rebuild
+      - task: nuke
+      - task: rebuild
