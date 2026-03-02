@@ -1,3 +1,6 @@
+[settings]
+auto_install = true
+
 [env]
 KUBECONFIG = "{{config_root}}/kubeconfig"
 SOPS_AGE_KEY_FILE = "{{config_root}}/age.key"
