@@ -22,15 +22,15 @@ tasks:
   install:
     desc: Install k3s on the Pi and fetch kubeconfig
     cmds:
-      - task: ansible:k3s
+      - task: ::ansible:k3s
     preconditions:
       - which ansible-playbook
 
   bootstrap:
     desc: Create in-cluster secrets and bootstrap Flux
     cmds:
-      - task: bootstrap:secrets
-      - task: bootstrap:flux
+      - task: ::bootstrap:secrets
+      - task: ::bootstrap:flux
     preconditions:
       - test -f {{.ROOT_DIR}}/kubeconfig
 
