@@ -42,6 +42,26 @@ tasks:
       - test -f {{.ROOT_DIR}}/kubeconfig
       - which kubectl
 
+  shutdown:
+    desc: Gracefully stop k3s and power off the Pi
+    prompt: ⚠️  This will SHUT DOWN the Pi. Continue?
+    cmds:
+      - echo "Stopping k3s service..."
+      - ssh {{.PI_HOST}} "sudo systemctl stop k3s"
+      - echo "Powering off..."
+      - ssh {{.PI_HOST}} "sudo shutdown -h now" || true
+      - echo "Pi is shutting down."
+
+  reboot:
+    desc: Gracefully stop k3s and reboot the Pi
+    prompt: ⚠️  This will REBOOT the Pi. Continue?
+    cmds:
+      - echo "Stopping k3s service..."
+      - ssh {{.PI_HOST}} "sudo systemctl stop k3s"
+      - echo "Rebooting..."
+      - ssh {{.PI_HOST}} "sudo reboot" || true
+      - echo "Pi is rebooting. Run 'task cluster:wait' to monitor readiness."
+
   init-fresh:
     desc: First-time DB setup — create empty database (no R2 backup needed)
     prompt: This creates a FRESH empty database (ignoring any R2 backups). Continue?
