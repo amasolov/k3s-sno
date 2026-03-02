@@ -19,7 +19,7 @@ spec:
       value: >-
         ["https://awx.ktmb1.net"]
     - setting: UI_NEXT
-      value: "true"
+      value: "True"
 
   projects_persistence: true
   projects_storage_class: local-path
