@@ -1,0 +1,28 @@
+[Unit]
+Description=Kiosk Browser (Cage + Chromium)
+After=network-online.target
+Wants=network-online.target
+After=systemd-user-sessions.service
+
+[Service]
+Type=simple
+User={{ kiosk_user }}
+
+# Wayland/wlroots environment
+Environment=WLR_LIBINPUT_NO_DEVICES=1
+Environment=XDG_RUNTIME_DIR=/run/user/{{ _kiosk_uid }}
+Environment=WLR_BACKENDS=drm
+
+# cage -s  →  multi-output support (needed for wlr-randr to work)
+ExecStart=/usr/bin/cage -s -- /usr/local/bin/kiosk-start.sh
+
+Restart=on-failure
+RestartSec=5
+
+# Harden
+ProtectSystem=strict
+ReadWritePaths=/run/user/{{ _kiosk_uid }}
+PrivateTmp=true
+
+[Install]
+WantedBy=graphical.target

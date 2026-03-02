@@ -81,6 +81,22 @@
             TAILSCALE_TAILNET: "-"
             TS_REQUIRED_TAGS: !unsafe "{{ required_tags | default('') }}"
 
+      - name: Pi Display Secrets
+        kind: cloud
+        inputs:
+          fields:
+            - id: home_wifi_ssid
+              type: string
+              label: Home WiFi SSID
+            - id: home_wifi_password
+              type: string
+              label: Home WiFi Password
+              secret: true
+        injectors:
+          extra_vars:
+            home_wifi_ssid: !unsafe "{{ home_wifi_ssid }}"
+            home_wifi_password: !unsafe "{{ home_wifi_password }}"
+
     # ━━━ Credentials ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_credentials:
       - name: Home Lab SSH
@@ -116,6 +132,15 @@
           client_secret: >-
             {{ lookup('amazon.aws.aws_secret', 'k3s-sno/tailscale/oauth-client-secret', region=aws_region) }}
           required_tags: "tag:ha-server,tag:display-pi"
+
+      - name: Pi Display Secrets
+        organization: KTMB1
+        credential_type: Pi Display Secrets
+        inputs:
+          home_wifi_ssid: >-
+            {{ lookup('amazon.aws.aws_secret', 'k3s-sno/pi-display/home-wifi-ssid', region=aws_region) }}
+          home_wifi_password: >-
+            {{ lookup('amazon.aws.aws_secret', 'k3s-sno/pi-display/home-wifi-password', region=aws_region) }}
 
     # ━━━ Projects ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_projects:
@@ -184,6 +209,68 @@
         description: >-
           Re-applies AWX configuration from Git. Requires an EE
           with awx.awx and amazon.aws collections installed.
+
+      - name: Provision Pi Display
+        organization: KTMB1
+        project: KTMB1
+        playbook: ansible/playbooks/pi-display-setup.yml
+        inventory: AWX Controller
+        credentials:
+          - Home Lab SSH
+          - Pi Display Secrets
+          - Tailscale OAuth
+        become_enabled: true
+        description: >-
+          Provisions a Raspberry Pi Zero 2 W as a Home Assistant kiosk
+          display with dual WiFi, Tailscale, and a fullscreen browser.
+        survey_enabled: true
+        survey_spec:
+          name: Pi Display Parameters
+          description: Per-device configuration for display provisioning
+          spec:
+            - question_name: Target Host
+              variable: target_host
+              type: text
+              required: true
+              question_description: >-
+                IP address or hostname of the Pi on the local network.
+            - question_name: Pi Hostname
+              variable: pi_hostname
+              type: text
+              required: true
+              question_description: >-
+                Desired hostname for this Pi (e.g. ha-display-kitchen).
+            - question_name: Customer WiFi SSID
+              variable: customer_wifi_ssid
+              type: text
+              required: true
+              question_description: >-
+                Customer's WiFi network name.
+            - question_name: Customer WiFi Password
+              variable: customer_wifi_password
+              type: password
+              required: true
+              question_description: >-
+                Customer's WiFi password.
+            - question_name: Display Rotation
+              variable: display_rotation
+              type: multiplechoice
+              required: false
+              default: "90"
+              choices:
+                - "0"
+                - "90"
+                - "180"
+                - "270"
+              question_description: >-
+                Screen rotation in degrees.
+            - question_name: Kiosk URL
+              variable: kiosk_url
+              type: text
+              required: false
+              default: "http://homeassistant.local:8123"
+              question_description: >-
+                URL to open in the kiosk browser.
 
     # ━━━ Workflow Templates ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_workflow_templates: []
@@ -322,6 +409,8 @@
         credentials: "{{ item.credentials | default(omit) }}"
         become_enabled: "{{ item.become_enabled | default(false) }}"
         extra_vars: "{{ item.extra_vars | default(omit) }}"
+        survey_enabled: "{{ item.survey_enabled | default(omit) }}"
+        survey_spec: "{{ item.survey_spec | default(omit) }}"
         description: "{{ item.description | default(omit) }}"
         state: present
       loop: "{{ awx_job_templates }}"

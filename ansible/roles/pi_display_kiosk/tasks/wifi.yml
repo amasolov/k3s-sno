@@ -1,0 +1,96 @@
+---
+- name: Ensure NetworkManager is running
+  ansible.builtin.systemd:
+    name: NetworkManager
+    enabled: true
+    state: started
+
+- name: Check existing WiFi connections
+  ansible.builtin.command:
+    cmd: nmcli -t -f NAME,TYPE connection show
+  register: _nm_connections
+  changed_when: false
+
+- name: Configure home WiFi
+  when: >-
+    home_wifi_ssid is defined and home_wifi_ssid | length > 0
+    and ('home-wifi' not in _nm_connections.stdout)
+  block:
+    - name: Create home WiFi connection
+      ansible.builtin.command:
+        cmd: >-
+          nmcli connection add
+          con-name home-wifi
+          type wifi
+          ssid "{{ home_wifi_ssid }}"
+          wifi-sec.key-mgmt wpa-psk
+          wifi-sec.psk "{{ home_wifi_password }}"
+          connection.autoconnect yes
+          connection.autoconnect-priority {{ home_wifi_priority }}
+      changed_when: true
+
+- name: Update home WiFi credentials
+  when: >-
+    home_wifi_ssid is defined and home_wifi_ssid | length > 0
+    and ('home-wifi' in _nm_connections.stdout)
+  block:
+    - name: Update home WiFi SSID
+      ansible.builtin.command:
+        cmd: "nmcli connection modify home-wifi 802-11-wireless.ssid \"{{ home_wifi_ssid }}\""
+      changed_when: true
+
+    - name: Update home WiFi password
+      ansible.builtin.command:
+        cmd: "nmcli connection modify home-wifi wifi-sec.psk \"{{ home_wifi_password }}\""
+      changed_when: true
+      no_log: true
+
+    - name: Update home WiFi priority
+      ansible.builtin.command:
+        cmd: "nmcli connection modify home-wifi connection.autoconnect-priority {{ home_wifi_priority }}"
+      changed_when: true
+
+- name: Configure customer WiFi
+  when: >-
+    customer_wifi_ssid is defined and customer_wifi_ssid | length > 0
+    and ('customer-wifi' not in _nm_connections.stdout)
+  block:
+    - name: Create customer WiFi connection
+      ansible.builtin.command:
+        cmd: >-
+          nmcli connection add
+          con-name customer-wifi
+          type wifi
+          ssid "{{ customer_wifi_ssid }}"
+          wifi-sec.key-mgmt wpa-psk
+          wifi-sec.psk "{{ customer_wifi_password }}"
+          connection.autoconnect yes
+          connection.autoconnect-priority {{ customer_wifi_priority }}
+      changed_when: true
+      no_log: true
+
+- name: Update customer WiFi credentials
+  when: >-
+    customer_wifi_ssid is defined and customer_wifi_ssid | length > 0
+    and ('customer-wifi' in _nm_connections.stdout)
+  block:
+    - name: Update customer WiFi SSID
+      ansible.builtin.command:
+        cmd: "nmcli connection modify customer-wifi 802-11-wireless.ssid \"{{ customer_wifi_ssid }}\""
+      changed_when: true
+
+    - name: Update customer WiFi password
+      ansible.builtin.command:
+        cmd: "nmcli connection modify customer-wifi wifi-sec.psk \"{{ customer_wifi_password }}\""
+      changed_when: true
+      no_log: true
+
+    - name: Update customer WiFi priority
+      ansible.builtin.command:
+        cmd: "nmcli connection modify customer-wifi connection.autoconnect-priority {{ customer_wifi_priority }}"
+      changed_when: true
+
+- name: Reload NetworkManager connections
+  ansible.builtin.command:
+    cmd: nmcli connection reload
+  changed_when: false

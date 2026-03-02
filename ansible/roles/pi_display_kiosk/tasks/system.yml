@@ -1,0 +1,82 @@
+---
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ pi_hostname }}"
+
+- name: Update /etc/hosts with new hostname
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1\t{{ pi_hostname }}"
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ pi_timezone }}"
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - git
+      - curl
+      - wget
+      - raspi-config
+      - python3-dbus
+    state: present
+
+- name: Enable SPI interface
+  ansible.builtin.lineinfile:
+    path: "{{ boot_config_path }}"
+    regexp: '^#?dtparam=spi='
+    line: "dtparam=spi=on"
+  notify: reboot required
+
+- name: Check if swap file exists
+  ansible.builtin.stat:
+    path: /swapfile
+  register: _swap_file
+
+- name: Create swap file
+  when: not _swap_file.stat.exists
+  block:
+    - name: Allocate swap file
+      ansible.builtin.command:
+        cmd: "dd if=/dev/zero of=/swapfile bs=1M count={{ swap_size_mb }}"
+      changed_when: true
+
+    - name: Set swap file permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+
+    - name: Format swap file
+      ansible.builtin.command:
+        cmd: mkswap /swapfile
+      changed_when: true
+
+    - name: Enable swap file
+      ansible.builtin.command:
+        cmd: swapon /swapfile
+      changed_when: true
+
+- name: Persist swap in fstab
+  ansible.posix.mount:
+    path: none
+    src: /swapfile
+    fstype: swap
+    opts: sw
+    state: present
+
+- name: Disable unnecessary services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - bluetooth
+    - hciuart
+  ignore_errors: true

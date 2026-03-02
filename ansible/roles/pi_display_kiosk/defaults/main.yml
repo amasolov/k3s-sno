@@ -1,0 +1,40 @@
+---
+# ━━━ System ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+pi_hostname: "{{ inventory_hostname }}"
+pi_user: amasolov
+pi_timezone: America/New_York
+swap_size_mb: 1024
+
+# ━━━ WiFi ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Home WiFi (injected by AWX "Pi Display Secrets" credential)
+# home_wifi_ssid: ""
+# home_wifi_password: ""
+home_wifi_priority: 10
+
+# Customer WiFi (from AWX survey)
+# customer_wifi_ssid: ""
+# customer_wifi_password: ""
+customer_wifi_priority: 20
+
+# ━━━ Tailscale ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Auth key is generated at runtime from the Tailscale OAuth client
+# credentials (TS_OAUTH_CLIENT_ID / TS_OAUTH_CLIENT_SECRET env vars
+# injected by AWX "Tailscale OAuth" credential).
+tailscale_tags: "tag:display-pi"
+tailscale_api_base: "https://api.tailscale.com/api/v2"
+
+# ━━━ Display (MPI5008 — 5" HDMI 800×480) ━━━━━━━━━━━━━
+display_rotation: 90
+hdmi_group: 2
+hdmi_mode: 87
+hdmi_cvt: "800 480 60 6 0 0 0"
+hdmi_drive: 1
+boot_config_path: /boot/firmware/config.txt
+
+# ads7846 resistive touch controller (SPI)
+touch_overlay: "ads7846"
+touch_overlay_params: "cs=1,penirq=25,penirq_pull=2,speed=50000,keep_vref_on=0,swapxy=0,pmax=255,xohms=150,xmin=200,xmax=3900,ymin=200,ymax=3900"
+
+# ━━━ Kiosk ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+kiosk_url: "http://homeassistant.local:8123"
+kiosk_user: kiosk

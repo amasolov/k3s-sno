@@ -1,0 +1,46 @@
+---
+# MPI5008 — 5" HDMI display at 800×480 with ads7846 resistive touch.
+# These config.txt entries replace what LCD-show's LCD5-show script does,
+# adapted for Bookworm's /boot/firmware/ layout and KMS driver.
+
+- name: Set HDMI group
+  ansible.builtin.lineinfile:
+    path: "{{ boot_config_path }}"
+    regexp: '^#?hdmi_group='
+    line: "hdmi_group={{ hdmi_group }}"
+  notify: reboot required
+
+- name: Set HDMI mode
+  ansible.builtin.lineinfile:
+    path: "{{ boot_config_path }}"
+    regexp: '^#?hdmi_mode='
+    line: "hdmi_mode={{ hdmi_mode }}"
+  notify: reboot required
+
+- name: Set HDMI custom timing (CVT)
+  ansible.builtin.lineinfile:
+    path: "{{ boot_config_path }}"
+    regexp: '^#?hdmi_cvt='
+    line: "hdmi_cvt={{ hdmi_cvt }}"
+  notify: reboot required
+
+- name: Set HDMI drive mode (HDMI audio+video)
+  ansible.builtin.lineinfile:
+    path: "{{ boot_config_path }}"
+    regexp: '^#?hdmi_drive='
+    line: "hdmi_drive={{ hdmi_drive }}"
+  notify: reboot required
+
+- name: Force HDMI hotplug (display always detected)
+  ansible.builtin.lineinfile:
+    path: "{{ boot_config_path }}"
+    regexp: '^#?hdmi_force_hotplug='
+    line: "hdmi_force_hotplug=1"
+  notify: reboot required
+
+- name: Configure touch screen overlay (ads7846 via SPI)
+  ansible.builtin.lineinfile:
+    path: "{{ boot_config_path }}"
+    regexp: '^#?dtoverlay={{ touch_overlay }}'
+    line: "dtoverlay={{ touch_overlay }},{{ touch_overlay_params }}"
+  notify: reboot required

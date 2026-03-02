@@ -1,0 +1,97 @@
+---
+- name: Check if Tailscale is installed
+  ansible.builtin.command:
+    cmd: tailscale version
+  register: _ts_version
+  changed_when: false
+  failed_when: false
+
+- name: Install Tailscale
+  when: _ts_version.rc != 0
+  block:
+    - name: Download Tailscale install script
+      ansible.builtin.get_url:
+        url: https://tailscale.com/install.sh
+        dest: /tmp/tailscale-install.sh
+        mode: "0755"
+
+    - name: Run Tailscale install script
+      ansible.builtin.command:
+        cmd: /tmp/tailscale-install.sh
+      changed_when: true
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Remove install script
+      ansible.builtin.file:
+        path: /tmp/tailscale-install.sh
+        state: absent
+
+- name: Enable and start Tailscale service
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Check Tailscale status
+  ansible.builtin.command:
+    cmd: tailscale status --json
+  register: _ts_status
+  changed_when: false
+  failed_when: false
+
+- name: Authenticate Tailscale via OAuth-generated auth key
+  when: >-
+    _ts_status.rc != 0
+    or (_ts_status.stdout | from_json).BackendState != "Running"
+  block:
+    - name: Obtain OAuth access token
+      ansible.builtin.uri:
+        url: "{{ tailscale_api_base }}/oauth/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+        headers:
+          Authorization: "Basic {{ (_ts_oauth_creds | b64encode) }}"
+        return_content: true
+      register: _ts_token
+      no_log: true
+      delegate_to: localhost
+      become: false
+      vars:
+        _ts_oauth_creds: "{{ lookup('env', 'TS_OAUTH_CLIENT_ID') }}:{{ lookup('env', 'TS_OAUTH_CLIENT_SECRET') }}"
+
+    - name: Generate ephemeral reusable auth key
+      ansible.builtin.uri:
+        url: "{{ tailscale_api_base }}/tailnet/-/keys"
+        method: POST
+        body_format: json
+        body:
+          capabilities:
+            devices:
+              create:
+                reusable: false
+                ephemeral: false
+                tags:
+                  - "{{ tailscale_tags }}"
+          expirySeconds: 300
+        headers:
+          Authorization: "Bearer {{ _ts_token.json.access_token }}"
+        return_content: true
+        status_code: 200
+      register: _ts_authkey
+      no_log: true
+      delegate_to: localhost
+      become: false
+
+    - name: Join Tailscale network
+      ansible.builtin.command:
+        cmd: >-
+          tailscale up
+          --auth-key={{ _ts_authkey.json.key }}
+          --advertise-tags={{ tailscale_tags }}
+          --ssh
+          --hostname={{ pi_hostname }}
+      changed_when: true
+      no_log: true

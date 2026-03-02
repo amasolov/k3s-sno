@@ -1,0 +1,28 @@
+---
+- name: Initialize reboot flag
+  ansible.builtin.set_fact:
+    _reboot_required: false
+
+- name: System baseline
+  ansible.builtin.include_tasks: system.yml
+
+- name: WiFi configuration
+  ansible.builtin.include_tasks: wifi.yml
+
+- name: Tailscale
+  ansible.builtin.include_tasks: tailscale.yml
+
+- name: Display configuration
+  ansible.builtin.include_tasks: display.yml
+
+- name: Kiosk environment
+  ansible.builtin.include_tasks: kiosk.yml
+
+- name: Flush handlers before reboot check
+  ansible.builtin.meta: flush_handlers
+
+- name: Reboot if display/boot config changed
+  when: _reboot_required | bool
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+    msg: "Rebooting to apply display/boot configuration changes"

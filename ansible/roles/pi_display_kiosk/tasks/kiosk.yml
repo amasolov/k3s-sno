@@ -1,0 +1,57 @@
+---
+- name: Install kiosk packages
+  ansible.builtin.apt:
+    name:
+      - cage
+      - wlr-randr
+      - chromium-browser
+      - fonts-liberation
+      - libinput-tools
+    state: present
+
+- name: Create kiosk user
+  ansible.builtin.user:
+    name: "{{ kiosk_user }}"
+    shell: /bin/bash
+    create_home: true
+    system: true
+    groups:
+      - video
+      - input
+      - render
+    append: true
+
+- name: Look up kiosk user UID
+  ansible.builtin.command:
+    cmd: "id -u {{ kiosk_user }}"
+  register: _kiosk_uid_result
+  changed_when: false
+
+- name: Set kiosk UID fact
+  ansible.builtin.set_fact:
+    _kiosk_uid: "{{ _kiosk_uid_result.stdout }}"
+
+- name: Ensure loginctl linger for kiosk user (XDG_RUNTIME_DIR at boot)
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ kiosk_user }}"
+  changed_when: true
+
+- name: Deploy kiosk startup script
+  ansible.builtin.template:
+    src: kiosk-start.sh.j2
+    dest: /usr/local/bin/kiosk-start.sh
+    mode: "0755"
+  notify: restart kiosk
+
+- name: Deploy kiosk systemd service
+  ansible.builtin.template:
+    src: kiosk.service.j2
+    dest: /etc/systemd/system/kiosk.service
+    mode: "0644"
+  notify: restart kiosk
+
+- name: Enable kiosk service
+  ansible.builtin.systemd:
+    name: kiosk
+    enabled: true
+    daemon_reload: true

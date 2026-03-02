@@ -1,0 +1,42 @@
+---
+# Provision a Raspberry Pi Zero 2 W as a Home Assistant kiosk display.
+#
+# Intended to be run from AWX with survey variables:
+#   target_host            – IP or hostname of the Pi on the local network
+#   pi_hostname            – desired hostname
+#   customer_wifi_ssid     – customer WiFi SSID
+#   customer_wifi_password – customer WiFi password
+#   display_rotation       – screen rotation in degrees (0/90/180/270)
+#   kiosk_url              – Home Assistant URL
+#
+# Secrets are injected by the AWX "Pi Display Secrets" credential:
+#   home_wifi_ssid, home_wifi_password
+# Tailscale OAuth credentials are injected as env vars by the
+# "Tailscale OAuth" credential (TS_OAUTH_CLIENT_ID / TS_OAUTH_CLIENT_SECRET).
+
+- name: Build dynamic inventory from survey target
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Validate target_host is provided
+      ansible.builtin.assert:
+        that:
+          - target_host is defined
+          - target_host | length > 0
+        fail_msg: "target_host must be provided via AWX survey or extra_vars"
+
+    - name: Add target Pi to runtime inventory
+      ansible.builtin.add_host:
+        name: "{{ target_host }}"
+        groups: target_pi
+        ansible_user: "{{ pi_user | default('amasolov') }}"
+
+- name: Provision Pi Display Kiosk
+  hosts: target_pi
+  become: true
+  gather_facts: true
+
+  roles:
+    - pi_display_kiosk

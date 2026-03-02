@@ -69,8 +69,10 @@ Create the following secrets in AWS Secrets Manager:
 | `k3s-sno/awx/postgres-password` | PostgreSQL database password |
 | `k3s-sno/awx/secret-key` | AWX secret key for encryption |
 | `k3s-sno/awx/ssh-private-key` | SSH private key for managed hosts |
-| `k3s-sno/tailscale/oauth-client-id` | Tailscale OAuth client ID (for dynamic inventory) |
-| `k3s-sno/tailscale/oauth-client-secret` | Tailscale OAuth client secret (for dynamic inventory) |
+| `k3s-sno/tailscale/oauth-client-id` | Tailscale OAuth client ID (for dynamic inventory + Pi display provisioning) |
+| `k3s-sno/tailscale/oauth-client-secret` | Tailscale OAuth client secret (for dynamic inventory + Pi display provisioning) |
+| `k3s-sno/pi-display/home-wifi-ssid` | Home WiFi SSID (for Pi display kiosk provisioning) |
+| `k3s-sno/pi-display/home-wifi-password` | Home WiFi password (for Pi display kiosk provisioning) |
 
 ```bash
 aws secretsmanager create-secret --name k3s-sno/awx/admin-password \
@@ -90,6 +92,12 @@ aws secretsmanager create-secret --name k3s-sno/tailscale/oauth-client-id \
 
 aws secretsmanager create-secret --name k3s-sno/tailscale/oauth-client-secret \
   --secret-string "tskey-client-..."
+
+aws secretsmanager create-secret --name k3s-sno/pi-display/home-wifi-ssid \
+  --secret-string "your-home-wifi-ssid"
+
+aws secretsmanager create-secret --name k3s-sno/pi-display/home-wifi-password \
+  --secret-string "your-home-wifi-password"
 ```
 
 ## 2. Install k3s
@@ -171,6 +179,33 @@ To add resources, edit the variable lists in `awx-config.yml` and re-run `task a
 
 The self-configure job template lets AWX re-run this playbook against itself. It requires an Execution Environment with the `awx.awx` and `amazon.aws` collections installed.
 
+## Pi Display Kiosk Provisioning
+
+AWX can provision a Raspberry Pi Zero 2 W as a Home Assistant kiosk display with a 5" HDMI touchscreen (MPI5008). The **Provision Pi Display** job template configures:
+
+- Dual WiFi (home network for debugging + customer network)
+- Tailscale with `tag:display-pi` and SSH enabled (auth key generated at runtime from Tailscale OAuth)
+- HDMI output at 800x480 with configurable rotation (0/90/180/270, default 90)
+- Cage (Wayland kiosk compositor) + Chromium in fullscreen pointing at Home Assistant
+- 1GB swap file for the 512MB Pi Zero 2 W
+
+### Provisioning a new display
+
+1. Flash **Raspberry Pi OS Lite 64-bit** (Bookworm) via Raspberry Pi Imager with:
+   - Username: `amasolov`, SSH authorized key (same as Home Lab SSH)
+   - WiFi: your home network
+2. Boot the Pi and note its IP address
+3. In AWX, launch **Provision Pi Display** and fill in the survey:
+   - `target_host` -- IP or hostname of the Pi on the local network
+   - `pi_hostname` -- desired hostname (e.g. `ha-display-kitchen`)
+   - `customer_wifi_ssid` / `customer_wifi_password` -- customer's WiFi
+   - `display_rotation` -- screen rotation (default: 90)
+   - `kiosk_url` -- HA dashboard URL (default: `http://homeassistant.local:8123`)
+4. After the job completes and the Pi reboots, it boots directly into a fullscreen browser showing the HA dashboard
+5. The Pi automatically appears in the **Home Assistant** Tailscale inventory under group `display_pi`
+
+All subsequent management is via Tailscale SSH.
+
 ## 7. Access AWX
 
 Once all pods are running:
@@ -202,10 +237,13 @@ k3s-sno/
 │   │   ├── hosts.yml                # Managed host inventory
 │   │   ├── awx_config.yml          # AWX API connection for config-as-code
 │   │   └── tailscale_inventory.py  # Dynamic inventory from Tailscale API
+│   ├── roles/
+│   │   └── pi_display_kiosk/       # Ansible role: Pi kiosk display provisioning
 │   └── playbooks/
 │       ├── k3s-install.yml          # k3s cluster installation
 │       ├── k3s-nuke.yml             # k3s uninstall and cleanup
-│       └── awx-config.yml          # AWX configuration as code
+│       ├── awx-config.yml          # AWX configuration as code
+│       └── pi-display-setup.yml    # Provision Pi as HA kiosk display
 ├── kubernetes/
 │   ├── bootstrap/flux/              # Flux bootstrap (GitRepo + sync)
 │   ├── flux/config/                 # Top-level cluster Kustomization

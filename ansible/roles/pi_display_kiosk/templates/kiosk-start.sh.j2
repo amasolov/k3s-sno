@@ -1,0 +1,32 @@
+#!/bin/bash
+# Kiosk startup — called by cage via kiosk.service.
+# Rotates the display via wlr-randr, then launches Chromium in kiosk mode.
+
+set -euo pipefail
+
+{% set rotation_map = {'0': 'normal', '90': '90', '180': '180', '270': '270'} %}
+{% set transform = rotation_map[display_rotation | string] | default('90') %}
+
+# Give cage a moment to initialise the output
+sleep 2
+
+# Rotate the HDMI output (also transforms touch input coordinates)
+wlr-randr --output HDMI-A-1 --transform {{ transform }} || true
+
+exec chromium-browser \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --no-first-run \
+    --check-for-update-interval=31536000 \
+    --disable-features=TranslateUI \
+    --disable-component-update \
+    --disable-background-networking \
+    --disable-sync \
+    --disable-breakpad \
+    --disable-dev-shm-usage \
+    --disable-gpu-sandbox \
+    --process-per-site \
+    --ozone-platform=wayland \
+    --start-fullscreen \
+    "{{ kiosk_url }}"

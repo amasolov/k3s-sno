@@ -34,7 +34,8 @@ Thumbs.db
 
 # Ansible Galaxy collections/roles (installed locally)
 ansible/collections/
-ansible/roles/
+ansible/roles/*
+!ansible/roles/pi_display_kiosk/
 
 # Temporary files
 *.tmp
