@@ -316,6 +316,7 @@
       loop: "{{ awx_credential_types }}"
       loop_control:
         label: "{{ item.name }}"
+      ignore_errors: true
 
     # ── 3. Credentials ──────────────────────────────────
     - name: Configure credentials
@@ -330,6 +331,7 @@
       loop_control:
         label: "{{ item.name }}"
       no_log: true
+      ignore_errors: true
 
     # ── 4. Projects ─────────────────────────────────────
     - name: Configure projects
@@ -388,15 +390,11 @@
       awx.awx.inventory_source_update:
         name: "{{ item.name }}"
         inventory: "{{ item.inventory }}"
-        wait: true
-        timeout: 120
+        wait: false
       loop: "{{ awx_inventory_sources }}"
       loop_control:
         label: "{{ item.name }}"
-      retries: 3
-      delay: 30
-      register: _inv_sync
-      until: _inv_sync is not failed
+      ignore_errors: true
 
     # ── 7. Job templates ──────────────────────────────────
     - name: Configure job templates
