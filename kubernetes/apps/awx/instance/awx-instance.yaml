@@ -28,24 +28,40 @@ spec:
 
   web_resource_requirements:
     requests:
-      cpu: 200m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
       cpu: "1"
-      memory: 2Gi
+      memory: 1Gi
 
   task_resource_requirements:
     requests:
-      cpu: 200m
-      memory: 512Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
       cpu: "1"
-      memory: 2Gi
+      memory: 1Gi
 
   ee_resource_requirements:
     requests:
-      cpu: 200m
-      memory: 256Mi
+      cpu: 100m
+      memory: 128Mi
     limits:
       cpu: 500m
-      memory: 1Gi
+      memory: 512Mi
+
+  redis_resource_requirements:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+  rsyslog_resource_requirements:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
