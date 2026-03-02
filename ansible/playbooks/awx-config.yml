@@ -359,3 +359,39 @@
       loop_control:
         label: "{{ item.username }}"
       no_log: true
+
+    # ── 13. Remove default demo artifacts ─────────────────
+    - name: Remove Demo Job Template
+      awx.awx.job_template:
+        name: Demo Job Template
+        organization: Default
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Demo Project
+      awx.awx.project:
+        name: Demo Project
+        organization: Default
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Demo Inventory
+      awx.awx.inventory:
+        name: Demo Inventory
+        organization: Default
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Demo Credential
+      awx.awx.credential:
+        name: Demo Credential
+        organization: Default
+        credential_type: Machine
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Default organization
+      awx.awx.organization:
+        name: Default
+        state: absent
+      ignore_errors: true
