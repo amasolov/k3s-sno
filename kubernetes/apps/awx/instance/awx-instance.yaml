@@ -18,6 +18,8 @@ spec:
     - setting: CSRF_TRUSTED_ORIGINS
       value: >-
         ["https://awx.ktmb1.net"]
+    - setting: UI_NEXT
+      value: "true"
 
   projects_persistence: true
   projects_storage_class: local-path
