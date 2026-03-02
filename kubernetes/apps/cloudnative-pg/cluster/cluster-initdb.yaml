@@ -1,4 +1,8 @@
 ---
+# First-time bootstrap variant: creates a fresh empty database.
+# NOT tracked by Kustomize/Flux. Apply manually with:
+#   task cluster:init-fresh
+# Once the first backup completes, cluster.yaml (recovery) takes over.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -12,29 +16,12 @@ spec:
     storageClass: local-path
     size: 8Gi
 
-  # Restore from the latest R2 backup on cluster creation.
-  # For a truly fresh start (no backup in R2), run: task cluster:init-fresh
   bootstrap:
-    recovery:
-      source: awx-db-r2
-
-  externalClusters:
-    - name: awx-db-r2
-      barmanObjectStore:
-        serverName: awx-db
-        destinationPath: s3://k3s-snow/cnpg/
-        endpointURL: https://f83921207a0950106ace0d7751708a29.r2.cloudflarestorage.com
-        s3Credentials:
-          accessKeyId:
-            name: cnpg-r2-credentials
-            key: access-key-id
-          secretAccessKey:
-            name: cnpg-r2-credentials
-            key: secret-access-key
-        wal:
-          compression: gzip
-        data:
-          compression: gzip
+    initdb:
+      database: awx
+      owner: awx
+      secret:
+        name: awx-db-credentials
 
   resources:
     requests:

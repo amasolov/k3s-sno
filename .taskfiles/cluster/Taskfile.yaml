@@ -58,16 +58,41 @@ tasks:
       - test -f {{.ROOT_DIR}}/kubeconfig
       - which kubectl
 
+  init-fresh:
+    desc: First-time DB setup — create empty database (no R2 backup needed)
+    prompt: This creates a FRESH empty database (ignoring any R2 backups). Continue?
+    cmds:
+      - echo "Applying initdb cluster manifest (bypasses Flux recovery)..."
+      - kubectl apply -f {{.ROOT_DIR}}/kubernetes/apps/cloudnative-pg/cluster/cluster-initdb.yaml
+      - echo "Waiting for CNPG cluster to become ready..."
+      - |
+        for i in $(seq 1 40); do
+          phase=$(kubectl get cluster awx-db -n cnpg-system -o jsonpath='{.status.phase}' 2>/dev/null || echo "pending")
+          echo "  [$i/40] Cluster phase: $phase"
+          if [ "$phase" = "Cluster in healthy state" ]; then
+            echo "CNPG cluster is healthy."
+            break
+          fi
+          sleep 15
+        done
+      - echo "Triggering first backup..."
+      - kubectl apply -f {{.ROOT_DIR}}/kubernetes/apps/cloudnative-pg/cluster/scheduledbackup.yaml
+      - echo "First-time DB init complete. Subsequent rebuilds will auto-restore from R2."
+    preconditions:
+      - test -f {{.ROOT_DIR}}/kubeconfig
+      - which kubectl
+      - test -f {{.ROOT_DIR}}/kubernetes/apps/cloudnative-pg/cluster/cluster-initdb.yaml
+
   rebuild:
-    desc: Full rebuild — install k3s, bootstrap Flux, wait for readiness
+    desc: Full rebuild — install k3s, bootstrap Flux, wait for readiness (restores DB from R2)
     cmds:
       - task: cluster:install
       - task: cluster:bootstrap
       - task: cluster:wait
-      - echo "Cluster rebuilt. Run 'task ansible:awx-config' once AWX is ready."
+      - echo "Cluster rebuilt (DB restored from R2). Run 'task ansible:awx-config' once AWX is ready."
 
   nuke-rebuild:
-    desc: Nuke the cluster and rebuild from scratch
+    desc: Nuke the cluster and rebuild from scratch (restores DB from R2)
     prompt: ⚠️  This will DESTROY and REBUILD the cluster. Continue?
     cmds:
       - task: cluster:nuke

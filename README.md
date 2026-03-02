@@ -241,13 +241,14 @@ k3s-sno/
 | `task cluster:install` | Install k3s and fetch kubeconfig |
 | `task cluster:bootstrap` | Create secrets + bootstrap Flux |
 | `task cluster:wait` | Wait for Flux and AWX to become ready |
-| `task cluster:rebuild` | Full rebuild (install → bootstrap → wait) |
-| `task cluster:nuke-rebuild` | Destroy cluster and rebuild from scratch |
+| `task cluster:rebuild` | Full rebuild (install → bootstrap → wait), restores DB from R2 |
+| `task cluster:nuke-rebuild` | Destroy cluster and rebuild from scratch, restores DB from R2 |
+| `task cluster:init-fresh` | First-time setup: create empty DB (no R2 backup needed) |
 | `task reconcile` | Shortcut for `flux:reconcile` |
 
 ## Nuke & Rebuild
 
-To completely destroy and recreate the cluster from scratch:
+The CNPG cluster is configured to **automatically restore from the latest R2 backup** when recreated. After a nuke, your AWX data comes back seamlessly.
 
 ```bash
 task cluster:nuke-rebuild
@@ -268,6 +269,20 @@ The nuke step runs the `k3s-nuke.yml` playbook which:
 2. Removes leftover data directories (`/var/lib/rancher`, `/etc/rancher`, CNI)
 3. Prunes container images
 4. Deletes the local kubeconfig
+
+### First-time setup (no R2 backup yet)
+
+If the R2 bucket is empty (no prior backup exists), the recovery bootstrap will fail. Use `init-fresh` instead to create an empty database and take the first backup:
+
+```bash
+task cluster:install
+task cluster:bootstrap
+task cluster:init-fresh     # creates empty DB, triggers first backup
+task cluster:wait
+task ansible:awx-config
+```
+
+Once the first backup completes in R2, all subsequent `nuke-rebuild` cycles will restore automatically.
 
 ## Updating
 
