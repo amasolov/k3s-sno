@@ -68,11 +68,18 @@
               type: string
               label: OAuth Client Secret
               secret: true
+            - id: required_tags
+              type: string
+              label: Required Tags
+              help_text: >-
+                Comma-separated ACL tags to filter devices
+                (e.g. tag:ha-server,tag:display-pi). Leave empty for all.
         injectors:
           env:
             TS_OAUTH_CLIENT_ID: !unsafe "{{ client_id }}"
             TS_OAUTH_CLIENT_SECRET: !unsafe "{{ client_secret }}"
             TAILSCALE_TAILNET: "-"
+            TS_REQUIRED_TAGS: !unsafe "{{ required_tags | default('') }}"
 
     # ━━━ Credentials ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_credentials:
@@ -108,6 +115,7 @@
             {{ lookup('amazon.aws.aws_secret', 'k3s-sno/tailscale/oauth-client-id', region=aws_region) }}
           client_secret: >-
             {{ lookup('amazon.aws.aws_secret', 'k3s-sno/tailscale/oauth-client-secret', region=aws_region) }}
+          required_tags: "tag:ha-server,tag:display-pi"
 
     # ━━━ Projects ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_projects:

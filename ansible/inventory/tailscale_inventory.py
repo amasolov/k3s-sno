@@ -14,6 +14,10 @@ Environment variables
 TS_OAUTH_CLIENT_ID      (required)  OAuth client ID.
 TS_OAUTH_CLIENT_SECRET  (required)  OAuth client secret.
 TAILSCALE_TAILNET       (optional)  Tailnet name; defaults to ``-``.
+TS_REQUIRED_TAGS        (optional)  Comma-separated list of tags (e.g.
+                        ``tag:ha-server,tag:display-pi``).  When set, only
+                        devices carrying at least one of these tags are
+                        included.  Omit to import all authorized devices.
 """
 
 import base64
@@ -65,17 +69,23 @@ def get_devices(token):
 def build_inventory(devices):
     inventory = {"_meta": {"hostvars": {}}}
 
+    required_raw = os.environ.get("TS_REQUIRED_TAGS", "").strip()
+    required_tags = {t.strip() for t in required_raw.split(",") if t.strip()} if required_raw else set()
+
     for device in devices:
         if not device.get("authorized", False):
             continue
 
+        tags = device.get("tags", [])
+
+        if required_tags and not required_tags.intersection(tags):
+            continue
+
         hostname = device["hostname"]
         fqdn = device.get("name", "")
-        tags = device.get("tags", [])
 
         hostvars = {
             "ansible_host": fqdn,
-            "ansible_user": "amasolov",
             "tailscale_ip": device["addresses"][0] if device.get("addresses") else None,
             "tailscale_os": device.get("os", ""),
             "tailscale_online": device.get("online", False),
