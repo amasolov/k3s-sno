@@ -11,6 +11,8 @@ env:
   KUBECONFIG: '{{.ROOT_DIR}}/kubeconfig'
   SOPS_AGE_KEY_FILE: '{{.ROOT_DIR}}/age.key'
   ANSIBLE_CONFIG: '{{.ANSIBLE_DIR}}/ansible.cfg'
+  # macOS: prevent Python fork crash in Ansible workers (ObjC runtime)
+  OBJC_DISABLE_INITIALIZE_FORK_SAFETY: 'YES'
 
 includes:
   ansible: .taskfiles/ansible
