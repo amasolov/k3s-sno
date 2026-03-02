@@ -4,6 +4,10 @@ kind: Cluster
 metadata:
   name: awx-db
   namespace: cnpg-system
+  annotations:
+    # Safe for nuke/rebuild: the old cluster is gone and the restored
+    # instance starts a new PostgreSQL timeline for its WALs.
+    cnpg.io/skipEmptyWalArchiveCheck: enabled
 spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:16
@@ -11,10 +15,6 @@ spec:
   storage:
     storageClass: local-path
     size: 8Gi
-
-  # Each nuke/rebuild cycle needs a unique serverName so new WALs don't
-  # collide with the old archive. Before nuking, run: task cluster:rotate
-  serverName: awx-db-v2
 
   # Restore from the latest R2 backup on cluster creation.
   # For a truly fresh start (no backup in R2), run: task cluster:init-fresh

@@ -4,26 +4,7 @@ version: '3'
 vars:
   ANSIBLE_DIR: '{{.ROOT_DIR}}/ansible'
   PI_HOST: ktmb1-g-srv-003.iot.ktmb1.net
-  CLUSTER_YAML: '{{.ROOT_DIR}}/kubernetes/apps/cloudnative-pg/cluster/cluster.yaml'
-
 tasks:
-
-  rotate:
-    desc: Rotate CNPG serverName for next nuke/rebuild cycle
-    cmds:
-      - |
-        current=$(yq '.spec.serverName' {{.CLUSTER_YAML}})
-        version=${current##*-v}
-        next=$((version + 1))
-        echo "Rotating: $current → awx-db-v$next (recovery source: $current)"
-        yq -i ".spec.externalClusters[0].barmanObjectStore.serverName = \"$current\"" {{.CLUSTER_YAML}}
-        yq -i ".spec.serverName = \"awx-db-v$next\"" {{.CLUSTER_YAML}}
-      - git -C {{.ROOT_DIR}} add {{.CLUSTER_YAML}}
-      - git -C {{.ROOT_DIR}} commit -m "Rotate CNPG serverName for rebuild"
-      - git -C {{.ROOT_DIR}} push
-    preconditions:
-      - which yq git
-      - test -f {{.CLUSTER_YAML}}
 
   nuke:
     desc: Uninstall k3s from the Pi and remove local kubeconfig
