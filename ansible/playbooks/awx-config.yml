@@ -181,7 +181,14 @@
     awx_workflow_templates: []
 
     # ━━━ Schedules ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    awx_schedules: []
+    awx_schedules:
+      - name: "KTMB1 Project Sync"
+        unified_job_template: "KTMB1"
+        rrule: "DTSTART:20260101T000000Z RRULE:FREQ=HOURLY;INTERVAL=6"
+
+      - name: "Tailscale Inventory Sync"
+        unified_job_template: "Tailscale"
+        rrule: "DTSTART:20260101T001500Z RRULE:FREQ=HOURLY;INTERVAL=1"
 
     # ━━━ Notification Templates ━━━━━━━━━━━━━━━━━━━━━━━━
     awx_notification_templates: []
@@ -278,6 +285,16 @@
         update_on_launch: "{{ item.update_on_launch | default(true) }}"
         overwrite: "{{ item.overwrite | default(true) }}"
         state: present
+      loop: "{{ awx_inventory_sources }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Sync inventory sources
+      awx.awx.inventory_source_update:
+        name: "{{ item.name }}"
+        inventory: "{{ item.inventory }}"
+        wait: true
+        timeout: 120
       loop: "{{ awx_inventory_sources }}"
       loop_control:
         label: "{{ item.name }}"
