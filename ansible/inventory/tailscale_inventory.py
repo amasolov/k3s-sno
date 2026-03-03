@@ -84,9 +84,11 @@ def build_inventory(devices):
         hostname = device["hostname"]
         fqdn = device.get("name", "")
 
+        tailscale_ip = device["addresses"][0] if device.get("addresses") else None
+
         hostvars = {
-            "ansible_host": fqdn,
-            "tailscale_ip": device["addresses"][0] if device.get("addresses") else None,
+            "ansible_host": tailscale_ip or fqdn,
+            "tailscale_ip": tailscale_ip,
             "tailscale_os": device.get("os", ""),
             "tailscale_online": device.get("online", False),
         }

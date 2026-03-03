@@ -91,7 +91,6 @@
           tailscale up
           --auth-key={{ _ts_authkey.json.key }}
           --advertise-tags={{ tailscale_tags }}
-          --ssh
           --hostname={{ pi_hostname }}
       changed_when: true
       no_log: true
