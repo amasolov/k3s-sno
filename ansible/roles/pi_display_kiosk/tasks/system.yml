@@ -10,8 +10,9 @@
     line: "127.0.1.1\t{{ pi_hostname }}"
 
 - name: Set timezone
-  community.general.timezone:
-    name: "{{ pi_timezone }}"
+  ansible.builtin.command:
+    cmd: "timedatectl set-timezone {{ pi_timezone }}"
+  changed_when: true
 
 - name: Update apt cache
   ansible.builtin.apt:
@@ -64,12 +65,10 @@
       changed_when: true
 
 - name: Persist swap in fstab
-  ansible.posix.mount:
-    path: none
-    src: /swapfile
-    fstype: swap
-    opts: sw
-    state: present
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^/swapfile'
+    line: "/swapfile none swap sw 0 0"
 
 - name: Disable unnecessary services
   ansible.builtin.systemd:
