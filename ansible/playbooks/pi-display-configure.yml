@@ -14,9 +14,9 @@
   gather_facts: false
 
   vars:
-    kiosk_url: "{{ hostvars[inventory_hostname].kiosk_url | default('http://homeassistant.local:8123') }}"
-    display_rotation: "{{ hostvars[inventory_hostname].display_rotation | default('90') }}"
-    kiosk_user: "{{ hostvars[inventory_hostname].kiosk_user | default('kiosk') }}"
+    kiosk_url: "{{ kiosk_url | default('http://homeassistant.local:8123') }}"
+    display_rotation: "{{ display_rotation | default('90') }}"
+    kiosk_user: "{{ kiosk_user | default('kiosk') }}"
 
   tasks:
     - name: Look up kiosk user UID

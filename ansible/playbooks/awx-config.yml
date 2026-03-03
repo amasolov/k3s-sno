@@ -175,6 +175,11 @@
           Tailscale-connected Home Assistant hosts and related devices.
           Populated dynamically from the Tailscale API; hosts are grouped
           by ACL tag (tag:ha-server → ha_server, tag:display-pi → display_pi, etc.).
+        groups:
+          - name: display_pi
+            variables:
+              kiosk_url: "http://homeassistant.local:8123"
+              display_rotation: "90"
 
     # ━━━ Inventory Sources ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_inventory_sources:
@@ -380,6 +385,16 @@
         variables: "{{ item.1.variables | default({}) }}"
         state: present
       loop: "{{ awx_inventories | subelements('hosts', skip_missing=true) }}"
+      loop_control:
+        label: "{{ item.0.name }}/{{ item.1.name }}"
+
+    - name: Configure inventory groups
+      awx.awx.group:
+        name: "{{ item.1.name }}"
+        inventory: "{{ item.0.name }}"
+        variables: "{{ item.1.variables | default({}) }}"
+        state: present
+      loop: "{{ awx_inventories | subelements('groups', skip_missing=true) }}"
       loop_control:
         label: "{{ item.0.name }}/{{ item.1.name }}"
 
