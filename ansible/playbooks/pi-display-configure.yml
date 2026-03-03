@@ -1,0 +1,51 @@
+---
+# Update kiosk configuration on provisioned Pi displays.
+#
+# Reads per-host variables (kiosk_url, display_rotation) from the AWX
+# inventory and re-deploys the kiosk startup script.  Falls back to role
+# defaults when a host variable is not set.
+#
+# Target: "Home Assistant" inventory, limit to "display_pi" group or a
+# specific host.
+
+- name: Configure Pi Display Kiosk
+  hosts: display_pi
+  become: true
+  gather_facts: false
+
+  vars:
+    kiosk_url: "{{ hostvars[inventory_hostname].kiosk_url | default('http://homeassistant.local:8123') }}"
+    display_rotation: "{{ hostvars[inventory_hostname].display_rotation | default('90') }}"
+    kiosk_user: "{{ hostvars[inventory_hostname].kiosk_user | default('kiosk') }}"
+
+  tasks:
+    - name: Look up kiosk user UID
+      ansible.builtin.command:
+        cmd: "id -u {{ kiosk_user }}"
+      register: _kiosk_uid_result
+      changed_when: false
+
+    - name: Set kiosk UID fact
+      ansible.builtin.set_fact:
+        _kiosk_uid: "{{ _kiosk_uid_result.stdout }}"
+
+    - name: Deploy kiosk startup script
+      ansible.builtin.template:
+        src: ansible/roles/pi_display_kiosk/templates/kiosk-start.sh.j2
+        dest: /usr/local/bin/kiosk-start.sh
+        mode: "0755"
+      register: _kiosk_script
+
+    - name: Deploy kiosk systemd service
+      ansible.builtin.template:
+        src: ansible/roles/pi_display_kiosk/templates/kiosk.service.j2
+        dest: /etc/systemd/system/kiosk.service
+        mode: "0644"
+      register: _kiosk_service
+
+    - name: Restart kiosk if config changed
+      ansible.builtin.systemd:
+        name: kiosk
+        state: restarted
+        daemon_reload: true
+      when: _kiosk_script.changed or _kiosk_service.changed

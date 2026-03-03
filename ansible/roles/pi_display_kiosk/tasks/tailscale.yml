@@ -81,7 +81,7 @@
         return_content: true
         status_code: 200
       register: _ts_authkey
-      no_log: false
+      no_log: true
       delegate_to: localhost
       become: false
 

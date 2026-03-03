@@ -27,6 +27,7 @@
       - wget
       - raspi-config
       - python3-dbus
+      - locales-all
     state: present
 
 - name: Enable SPI interface

@@ -272,6 +272,19 @@
               question_description: >-
                 URL to open in the kiosk browser.
 
+      - name: Configure Pi Display
+        organization: KTMB1
+        project: KTMB1
+        playbook: ansible/playbooks/pi-display-configure.yml
+        inventory: Home Assistant
+        credentials:
+          - Home Lab SSH
+        become_enabled: true
+        description: >-
+          Re-applies kiosk configuration (URL, rotation) to provisioned
+          Pi displays using per-host variables from the inventory.
+          Target all display_pi hosts or limit to a specific host.
+
     # ━━━ Workflow Templates ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     awx_workflow_templates: []
 
