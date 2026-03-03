@@ -21,8 +21,8 @@ spec:
     - setting: UI_NEXT
       value: "True"
 
-  uwsgi_processes: 2
-  uwsgi_listen_queue_size: 64
+  uwsgi_processes: 1
+  uwsgi_listen_queue_size: 32
 
   projects_persistence: true
   projects_storage_class: local-path
@@ -34,14 +34,14 @@ spec:
       cpu: 100m
       memory: 256Mi
     limits:
-      memory: 1536Mi
+      memory: 768Mi
 
   task_resource_requirements:
     requests:
       cpu: 100m
       memory: 256Mi
     limits:
-      memory: 1280Mi
+      memory: 768Mi
 
   ee_resource_requirements:
     requests:
