@@ -13,10 +13,12 @@
   become: true
   gather_facts: false
 
-  vars:
-    kiosk_url: "{{ kiosk_url | default('http://homeassistant.local:8123') }}"
-    display_rotation: "{{ display_rotation | default('90') }}"
-    kiosk_user: "{{ kiosk_user | default('kiosk') }}"
+  pre_tasks:
+    - name: Apply variable defaults
+      ansible.builtin.set_fact:
+        kiosk_url: "{{ kiosk_url | default('http://homeassistant.local:8123') }}"
+        display_rotation: "{{ display_rotation | default('90') }}"
+        kiosk_user: "{{ kiosk_user | default('kiosk') }}"
 
   tasks:
     - name: Look up kiosk user UID
