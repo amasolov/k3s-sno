@@ -429,10 +429,11 @@
       awx.awx.project_update:
         project: "{{ item.name }}"
         wait: true
-        timeout: 120
+        timeout: 300
       loop: "{{ awx_projects }}"
       loop_control:
         label: "{{ item.name }}"
+      ignore_errors: true
 
     # ── 7. Job templates ──────────────────────────────────
     - name: Configure job templates
