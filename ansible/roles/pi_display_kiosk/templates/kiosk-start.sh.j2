@@ -13,7 +13,7 @@ sleep 2
 # Rotate the HDMI output (also transforms touch input coordinates)
 wlr-randr --output HDMI-A-1 --transform {{ transform }} || true
 
-exec chromium-browser \
+exec chromium \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \

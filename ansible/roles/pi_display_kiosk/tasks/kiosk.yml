@@ -4,7 +4,7 @@
     name:
       - cage
       - wlr-randr
-      - chromium-browser
+      - chromium
       - fonts-liberation
       - libinput-tools
     state: present
