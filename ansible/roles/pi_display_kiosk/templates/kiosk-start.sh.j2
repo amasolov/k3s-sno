@@ -28,5 +28,6 @@ exec chromium \
     --disable-gpu-sandbox \
     --process-per-site \
     --ozone-platform=wayland \
+    --enable-features=VirtualKeyboard \
     --start-fullscreen \
     "{{ kiosk_url }}"
