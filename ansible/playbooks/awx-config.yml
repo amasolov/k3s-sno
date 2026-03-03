@@ -409,6 +409,16 @@
         label: "{{ item.name }}"
       ignore_errors: true
 
+    # ── 6b. Sync project so AWX discovers new playbooks ──
+    - name: Sync project
+      awx.awx.project_update:
+        project: "{{ item.name }}"
+        wait: true
+        timeout: 120
+      loop: "{{ awx_projects }}"
+      loop_control:
+        label: "{{ item.name }}"
+
     # ── 7. Job templates ──────────────────────────────────
     - name: Configure job templates
       awx.awx.job_template:
