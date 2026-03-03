@@ -39,4 +39,4 @@
   gather_facts: true
 
   roles:
-    - pi_display_kiosk
+    - role: ansible/roles/pi_display_kiosk
