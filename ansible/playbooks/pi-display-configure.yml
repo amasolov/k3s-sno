@@ -33,14 +33,14 @@
 
     - name: Deploy kiosk startup script
       ansible.builtin.template:
-        src: ansible/roles/pi_display_kiosk/templates/kiosk-start.sh.j2
+        src: ../roles/pi_display_kiosk/templates/kiosk-start.sh.j2
         dest: /usr/local/bin/kiosk-start.sh
         mode: "0755"
       register: _kiosk_script
 
     - name: Deploy kiosk systemd service
       ansible.builtin.template:
-        src: ansible/roles/pi_display_kiosk/templates/kiosk.service.j2
+        src: ../roles/pi_display_kiosk/templates/kiosk.service.j2
         dest: /etc/systemd/system/kiosk.service
         mode: "0644"
       register: _kiosk_service
